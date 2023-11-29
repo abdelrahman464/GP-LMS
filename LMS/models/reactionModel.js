@@ -20,7 +20,7 @@ const ReactionSchema = new mongoose.Schema({
 // ^find => it mean if part of of teh word contains find
 ReactionSchema.pre(/^find/, function (next) {
   // this => query
-  this.populate({ path: "userId", select: "username" });
+  this.populate({ path: "userId", select: "username profileImg" });
   next();
 });
 const Reaction = mongoose.model("Reaction", ReactionSchema);

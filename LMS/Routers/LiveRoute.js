@@ -84,7 +84,7 @@ router.put(
   "/followLive/:courseId/:liveId",
   authServices.protect,
   authServices.allowedTo("user", "admin"),
-  checkAuthority2,
+  // checkAuthority2,
   followLive
 );
 

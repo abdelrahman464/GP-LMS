@@ -50,7 +50,7 @@ exports.createFilterObj = async (req, res, next) => {
 //---------------------------------------------------------------------------------------------------//
 //@desc this filter lives based on time (8 days ago) and their privillage
 exports.searchBydateFilterObj = async (req, res, next) => {
-  let filterObject = {};
+  const filterObject = {};
   const { date } = req.params;
   const components = date.split(" ");
   //filter the date
@@ -217,7 +217,7 @@ exports.myFollowedLives = asyncHandler(async (req, res) => {
 });
 //--------------------------------------------------------------------------------------
 exports.searchByDate = asyncHandler(async (req, res) => {
-  let filterObject = {};
+  const filterObject = {};
   const { date } = req.params;
   // Split the URL-encoded date string by %
   // Split the decoded date string by '%'
@@ -247,7 +247,7 @@ exports.searchByDate = asyncHandler(async (req, res) => {
     }
 
     // eslint-disable-next-line no-empty
-    else if (package.allCourses === true) {
+    if (package.allCourses === true) {
     } else {
       const coursesArray = package.courses.map((courseId) => courseId);
       filterObject.course = { $in: coursesArray };
@@ -260,9 +260,9 @@ exports.searchByDate = asyncHandler(async (req, res) => {
     return res
       .status(400)
       .json({ status: "faild", msg: "there are no lives for that date" });
-  } else {
+  } 
     return res.status(400).json({ status: "success", data: lives });
-  }
+  
 });
 //---------------------------------------------------------------------------------//
 exports.createLiveObj = asyncHandler(async (req, res, next) => {

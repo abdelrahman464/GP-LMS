@@ -1,4 +1,3 @@
-// database
 const mongoose = require("mongoose");
 const Course = require("./courseModel");
 const Lesson = require("./lessonModel");

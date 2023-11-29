@@ -4,7 +4,7 @@ const {
   createReviewValidator,
   updateReviewValidator,
   deleteReviewValidator,
-} = require("../utils/validators/educationValidators/reviewValidator");
+} = require("../utils/validators/reviewValidator");
 
 const {
   createFilterObj,

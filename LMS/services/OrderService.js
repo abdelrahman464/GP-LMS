@@ -8,7 +8,7 @@ const factory = require("./handllerFactory");
 const Order = require("../models/orderModel");
 const Package = require("../models/packageModel");
 const User = require("../models/userModel");
-const Coupon = require("../models");
+const Coupon = require("../models/couponModel");
 
 // const{calculateProfits}=require('../marketing/marketingService')
 
@@ -30,7 +30,7 @@ exports.findSpecificOrder = factory.getOne(Order);
 //@access protected/user
 exports.checkoutSession = asyncHandler(async (req, res, next) => {
   const { packageId } = req.params;
-  let metadataObject = {};
+  const metadataObject = {};
   metadataObject.type = "education";
   //app settings
   const taxPrice = 0;

@@ -1,4 +1,6 @@
+const asyncHandler = require("express-async-handler");
 const Chat = require("../models/ChatModel");
+const Message = require("../models/MessageModel");
 
 //@desc create a chat room between 2 users
 //@route POST /api/v1/chat\:receiverId
@@ -143,7 +145,7 @@ exports.updateParticipantRoleInChat = asyncHandler(async (req, res, next) => {
 
   // Find the participant in the chat
   const participant = chat.participants.find(
-    (participant) => String(participant.userId) === userId
+    (participant_) => String(participant_.userId) === userId
   );
 
   if (!participant) {

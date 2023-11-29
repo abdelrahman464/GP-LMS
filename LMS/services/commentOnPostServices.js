@@ -2,10 +2,10 @@ const asyncHandler = require("express-async-handler");
 const sharp = require("sharp");
 const { v4: uuidv4 } = require("uuid");
 const Comment = require("../models/commentModel");
-const factory = require("../handllerFactory");
+const factory = require("./handllerFactory");
 const {
   uploadSingleImage,
-} = require("../../middlewares/uploadImageMiddleware");
+} = require("../middlewares/uploadImageMiddleware");
 
 //upload Single image
 exports.uploadCommentImage = uploadSingleImage("image");

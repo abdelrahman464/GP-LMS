@@ -71,8 +71,8 @@ courseSchema.pre(/^find/, function (next) {
 });
 
 courseSchema.pre("remove", async function (next) {
+  
   //delete lessons related to sections related to course
-
   await Lesson.deleteMany({ course: this._id });
 
   //delete current course's posts

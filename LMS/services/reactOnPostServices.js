@@ -1,7 +1,7 @@
 const asyncHandler = require("express-async-handler");
 const Reaction = require("../models/reactionModel");
 const Post = require("../models/postModel");
-const factory = require("../handllerFactory");
+const factory = require("./handllerFactory");
 
 //filter reacts in specefic post by post id
 exports.createFilterObj = (req, res, next) => {

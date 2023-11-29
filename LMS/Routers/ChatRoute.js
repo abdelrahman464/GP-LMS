@@ -5,6 +5,7 @@ const {
   getMyChats,
 } = require("../services/ChatServices");
 const authServices = require("../services/authServices");
+
 const router = express.Router();
 
 router.post("/:receiverId", authServices.protect, createChat);

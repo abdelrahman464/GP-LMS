@@ -1,11 +1,12 @@
 const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
 
 const userShcema = mongoose.Schema(
   {
-    invitor:{
+    invitor: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      default:null
+      default: null,
     },
     startMarketing: {
       type: Boolean,
@@ -47,7 +48,6 @@ const userShcema = mongoose.Schema(
     profileImg: String,
     about: String,
     country: String,
-
   },
   { timestamps: true }
 );

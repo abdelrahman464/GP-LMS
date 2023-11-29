@@ -1,14 +1,14 @@
 const asyncHandler = require("express-async-handler");
 const sharp = require("sharp");
 const { v4: uuidv4 } = require("uuid");
-const ApiError = require("../../utils/apiError");
-const factory = require("../handllerFactory");
+const ApiError = require("../utils/apiError");
+const factory = require("./handllerFactory");
 const Post = require("../models/postModel");
 const Course = require("../models/courseModel");
 const Package = require("../models/packageModel");
 const {
   uploadSingleImage,
-} = require("../../middlewares/uploadImageMiddleware");
+} = require("../middlewares/uploadImageMiddleware");
 
 //upload Single image
 exports.uploadPostImage = uploadSingleImage("image");

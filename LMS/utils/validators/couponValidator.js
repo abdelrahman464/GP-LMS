@@ -1,5 +1,5 @@
 const { check, body } = require("express-validator");
-const Coupon = require("../../models/CouponModel");
+const Coupon = require("../../models/couponModel");
 const validatorMiddleware = require("../../middlewares/validatorMiddleware");
 
 exports.CouponIdValidator = [

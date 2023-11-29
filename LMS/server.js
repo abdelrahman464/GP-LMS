@@ -16,7 +16,8 @@ dotenv.config({ path: "config.env" });
 //database
 const dbConnection = require("./config/database");
 //route
-const mountRoutes = require("./routes");
+
+const mountRoutes = require("./Routers");
 
 //error class that i made in utils to handle operational error
 const ApiError = require("./utils/apiError");
@@ -33,7 +34,6 @@ const app = express();
 //enable other domains access your application
 app.use(cors());
 app.options("*", cors());
-
 
 // compress all responses
 app.use(compression());

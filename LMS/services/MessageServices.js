@@ -1,4 +1,5 @@
-const Message = require("../Models/Message");
+const asyncHandler = require("express-async-handler");
+const Message = require("../models/MessageModel");
 
 //@desc add a message to chat
 //@route POST /api/v1/message\chatId
@@ -69,7 +70,7 @@ exports.addReactionToMessage = asyncHandler(async (req, res) => {
   const message = await Message.findById(messageId);
 
   if (!message) {
-    return res.status(404).json({ error: 'Message not found' });
+    return res.status(404).json({ error: "Message not found" });
   }
 
   // Check if the user has already reacted to this message
@@ -78,7 +79,9 @@ exports.addReactionToMessage = asyncHandler(async (req, res) => {
   );
 
   if (existingReaction) {
-    return res.status(400).json({ error: 'User has already reacted to this message' });
+    return res
+      .status(400)
+      .json({ error: "User has already reacted to this message" });
   }
 
   // Add the reaction to the message
@@ -96,7 +99,7 @@ exports.removeReactionFromMessage = asyncHandler(async (req, res) => {
   const message = await Message.findById(messageId);
 
   if (!message) {
-    return res.status(404).json({ error: 'Message not found' });
+    return res.status(404).json({ error: "Message not found" });
   }
 
   // Find the index of the user's reaction
@@ -105,7 +108,9 @@ exports.removeReactionFromMessage = asyncHandler(async (req, res) => {
   );
 
   if (reactionIndex === -1) {
-    return res.status(404).json({ error: 'User reaction not found for this message' });
+    return res
+      .status(404)
+      .json({ error: "User reaction not found for this message" });
   }
 
   // Remove the reaction
@@ -125,7 +130,7 @@ exports.replyToMessage = asyncHandler(async (req, res) => {
   const repliedMessage = await Message.findById(messageId);
 
   if (!repliedMessage) {
-    return res.status(404).json({ error: 'Message not found' });
+    return res.status(404).json({ error: "Message not found" });
   }
 
   const replyMessage = new Message({
@@ -159,7 +164,7 @@ exports.forwardMessage = asyncHandler(async (req, res) => {
   const messageToForward = await Message.findById(messageId);
 
   if (!messageToForward) {
-    return res.status(404).json({ error: 'Message not found' });
+    return res.status(404).json({ error: "Message not found" });
   }
 
   const forwardedMessage = new Message({

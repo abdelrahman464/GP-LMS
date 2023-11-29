@@ -1,7 +1,7 @@
 const express = require("express");
 const authServices = require("../services/authServices");
 const {
-  checkAuthority2,
+  // checkAuthority2,
   createLessonValidator,
 } = require("../utils/validators/lessonsValidator");
 const {
@@ -35,7 +35,7 @@ router.get("/:id", authServices.protect, getLessonById);
 router.get(
   "/relatedLessons/:courseId",
   authServices.protect,
-  checkAuthority2,
+  // checkAuthority2,
   relatedLessons
 );
 
