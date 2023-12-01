@@ -50,7 +50,7 @@ app.use(compression());
 //pasring the comming data to json
 app.use(
   express.json({
-    limit: "250kp",
+    limit: "250kb",
   })
 );
 //serve static files inside 'uploads'
