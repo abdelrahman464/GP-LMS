@@ -2,7 +2,7 @@ const asyncHandler = require("express-async-handler");
 const Message = require("../models/MessageModel");
 
 //@desc add a message to chat
-//@route POST /api/v1/message\chatId
+//@route POST /api/v1/message\:chatId
 //@access protected
 exports.addMessage = asyncHandler(async (req, res) => {
   const { chatId } = req.params;
@@ -65,7 +65,8 @@ exports.deleteMessage = asyncHandler(async (req, res) => {
 //@access protected
 exports.addReactionToMessage = asyncHandler(async (req, res) => {
   const { messageId } = req.params;
-  const { userId, emoji } = req.body;
+  const { emoji } = req.body;
+  const userId = req.user._id; // logged user id
 
   const message = await Message.findById(messageId);
 
@@ -91,13 +92,13 @@ exports.addReactionToMessage = asyncHandler(async (req, res) => {
   res.status(200).json(message);
 });
 //@desc Remove a user's reaction from a message
-//@route DELETE /api/v1/message/:messageId/reactions/:userId
+//@route DELETE /api/v1/message/:messageId/reactions
 //@access protected
 exports.removeReactionFromMessage = asyncHandler(async (req, res) => {
-  const { messageId, userId } = req.params;
+  const { messageId } = req.params;
+  const userId = req.user._id;
 
   const message = await Message.findById(messageId);
-
   if (!message) {
     return res.status(404).json({ error: "Message not found" });
   }
@@ -154,11 +155,10 @@ exports.getRepliesToMessage = asyncHandler(async (req, res) => {
   res.status(200).json(replies);
 });
 //@desc Forward a message to another chat
-//@route POST /api/v1/message/:messageId/forward
+//@route POST /api/v1/message/:messageId/forward/:chatId
 //@access protected
 exports.forwardMessage = asyncHandler(async (req, res) => {
-  const { messageId } = req.params;
-  const { chatId } = req.body;
+  const { messageId, chatId } = req.params;
   const senderId = req.user._id; // logged user id
 
   const messageToForward = await Message.findById(messageId);
