@@ -53,6 +53,6 @@ LiveSchema.pre(/^find/, function (next) {
   this.populate({ path: "course", select: "title" });
   next();
 });
-const Live = mongoose.model("Live", LiveSchema);
 
+const Live = mongoose.model("Live", LiveSchema);
 module.exports = Live;

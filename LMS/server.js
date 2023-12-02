@@ -28,7 +28,7 @@ const globalError = require("./middlewares/errorMiddleware");
 
 //connect with database
 dbConnection();
-mongoose.set("strictQuery", true);
+mongoose.set("strictQuery", false);
 //express app
 const app = express();
 //enable other domains access your application

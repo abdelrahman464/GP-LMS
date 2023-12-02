@@ -9,9 +9,7 @@ exports.signupValidator = [
     .isLength({ min: 2 })
     .withMessage("too short User name")
     .isLength({ max: 100 })
-    .withMessage("too long User name")
-    ,
-
+    .withMessage("too long User name"),
   check("email")
     .notEmpty()
     .withMessage("Email required")

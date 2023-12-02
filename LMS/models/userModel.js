@@ -3,19 +3,9 @@ const bcrypt = require("bcryptjs");
 
 const userShcema = mongoose.Schema(
   {
-    invitor: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      default: null,
-    },
-    startMarketing: {
-      type: Boolean,
-      default: false,
-    },
     username: {
       type: String,
       trim: true,
-      required: [true, "name required"],
     },
     email: {
       type: String,
@@ -32,14 +22,6 @@ const userShcema = mongoose.Schema(
     passwordResetCode: String,
     passwordResetExpires: Date,
     passwordResetVerified: Boolean,
-    firstname: {
-      type: String,
-      required: true,
-    },
-    lastname: {
-      type: String,
-      required: true,
-    },
     role: {
       type: String,
       enum: ["user", "instractor", "admin"],

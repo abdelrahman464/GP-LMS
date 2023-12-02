@@ -1,7 +1,7 @@
 const { check } = require("express-validator");
 const validatorMiddleware = require("../../middlewares/validatorMiddleware");
 const Course = require("../../models/courseModel");
-const Live = require("../../models/LiveModel");
+const Live = require("../../models/liveModel");
 //delete | update | follow  
 exports.checkLiveAuthority=[
     check("id")

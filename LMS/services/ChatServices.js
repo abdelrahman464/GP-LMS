@@ -10,7 +10,16 @@ exports.createChat = asyncHandler(async (req, res, next) => {
   const { receiverId } = req.params;
 
   const newChat = await Chat.create({
-    members: [senderId, receiverId],
+    participants: [
+      {
+        userId: senderId,
+        isAdmin: false,
+      },
+      {
+        userId: receiverId,
+        isAdmin: false,
+      },
+    ],
   });
   res.status(201).json({ data: newChat });
 });
@@ -19,12 +28,15 @@ exports.createChat = asyncHandler(async (req, res, next) => {
 //@access protected
 exports.createGroupChat = asyncHandler(async (req, res, next) => {
   const creatorId = req.user._id;
-  const { memberIds, groupName, description } = req.body;
+  console.log(`user id  => ${req.user}`);
+  const { participantIds, groupName, description } = req.body; // Changed memberIds to participantIds
 
-  const allMembers = [...new Set([...memberIds, creatorId])];
+  const allParticipants = [
+    ...new Set([...participantIds, { userId: creatorId, isAdmin: true }]),
+  ];
 
   const newGroupChat = await Chat.create({
-    members: allMembers,
+    participants: allParticipants,
     isGroupChat: true,
     creator: creatorId,
     groupName,
@@ -33,6 +45,7 @@ exports.createGroupChat = asyncHandler(async (req, res, next) => {
 
   res.status(201).json({ data: newGroupChat });
 });
+
 //@desc Get group chats of the logged-in user with detailed participant information
 //@route GET /api/v1/chat/loggedUserGroupChats
 //@access protected
@@ -42,13 +55,11 @@ exports.getLoggedUserGroupChats = asyncHandler(async (req, res, next) => {
   // Find group chats where the logged-in user is a participant
   const groupChats = await Chat.find({
     isGroupChat: true, // Assuming isGroupChat differentiates group chats from direct chats
-    'participants.userId': loggedUserId,
-  })
-  .populate({
-    path: 'participants.userId',
-    select: 'username',
-  })
-
+    "participants.userId": loggedUserId,
+  }).populate({
+    path: "participants.userId",
+    select: "username",
+  });
 
   res.status(200).json({ data: groupChats });
 });
@@ -60,18 +71,15 @@ exports.getLoggedUserChats = asyncHandler(async (req, res, next) => {
 
   // Find chats where the logged-in user is a participant and it's not a group chat
   const userChats = await Chat.find({
-    members: loggedUserId, // Assuming direct chats contain only the logged-in user in the 'members' array
+    "participants.userId": loggedUserId, // Checking if the logged-in user exists in participants
     isGroupChat: false, // Filtering out group chats
-  })
-  .populate({
-    path: 'members',
-    select: 'username',
-  })
- 
+  }).populate({
+    path: "participants.userId", // Populating the username from the participants
+    select: "username",
+  });
 
   res.status(200).json({ data: userChats });
 });
-
 
 //@desc Add a participant to a chat with a role
 //@route PUT /api/v1/chat/:chatId/addParticipant
@@ -135,10 +143,11 @@ exports.removeParticipantFromChat = asyncHandler(async (req, res, next) => {
 //@route PUT /api/v1/chat/:chatId/updateParticipantRole
 //@access protected
 exports.updateParticipantRoleInChat = asyncHandler(async (req, res, next) => {
-  const { chatId, userId, isAdmin } = req.body; // Chat ID, User ID, and desired role
+  const { userId, isAdmin } = req.body; // Chat ID, User ID, and desired role
+  const { chatId } = req.params;
+
 
   const chat = await Chat.findById(chatId);
-
   if (!chat) {
     return res.status(404).json({ error: "Chat not found" });
   }
@@ -207,7 +216,7 @@ exports.deleteChat = asyncHandler(async (req, res, next) => {
   const chat = await Chat.findById(chatId);
 
   if (!chat) {
-    return res.status(404).json({ error: 'Chat not found' });
+    return res.status(404).json({ error: "Chat not found" });
   }
 
   // Implement logic to delete associated messages, participants, etc.
@@ -216,20 +225,22 @@ exports.deleteChat = asyncHandler(async (req, res, next) => {
 
   await chat.remove(); // Remove the chat
 
-  res.status(200).json({ message: 'Chat deleted successfully' });
+  res.status(200).json({ message: "Chat deleted successfully" });
 });
 
 //@desc get all user chat rooms
 //@route GET /api/v1/chat/myChats
 //@access private
 exports.getMyChats = asyncHandler(async (req, res) => {
-  const { userId } = req.user._id; // logged user id
+  const userId = req.user._id; // logged user id
 
   const chat = await Chat.find({
-    members: { $in: [userId] },
+    "participants.userId": userId, // Considering the updated schema with 'participants'
   });
+
   res.status(200).json({ data: chat });
 });
+
 //@desc Find a specific chat between two users that the logged-in user is part of
 //@route GET /api/v1/chat/find/:secondPersonId
 //@access private
@@ -238,11 +249,20 @@ exports.findChat = asyncHandler(async (req, res) => {
   const { secondPersonId } = req.params; // Second participant of the chat
 
   const chat = await Chat.findOne({
-    members: { $all: [loggedUserId, secondPersonId] },
-  })
-  .populate({
-    path: 'participants.userId', // Populate participant details
-    select: 'username email' // Select fields from the User model
+    $and: [
+      {
+        "participants.userId": loggedUserId,
+      },
+      {
+        "participants.userId": secondPersonId,
+      },
+      {
+        isGroupChat: false, // Ensuring it's not a group chat
+      },
+    ],
+  }).populate({
+    path: "participants.userId", // Populate participant details
+    select: "username email", // Select fields from the User model
   });
 
   res.status(200).json({ data: chat });
