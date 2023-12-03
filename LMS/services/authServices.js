@@ -13,7 +13,7 @@ const generateToken = require("../utils/generateToken");
 exports.signup = asyncHandler(async (req, res, next) => {
   //1-create user
   const user = await User.create({
-    name: req.body.name,
+    username: req.body.username,
     email: req.body.email,
     password: req.body.password,
   });

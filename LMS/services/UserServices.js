@@ -46,7 +46,7 @@ exports.updateUser = asyncHandler(async (req, res, next) => {
   const user = await User.findByIdAndUpdate(
     req.params.id,
     {
-      name: req.body.name,
+      username: req.body.username,
       email: req.body.email,
       phone: req.body.phone,
       profileImg: req.body.profileImg,
@@ -118,7 +118,7 @@ exports.updateLoggedUserData = asyncHandler(async (req, res, next) => {
   const user = await User.findByIdAndUpdate(
     req.user._id,
     {
-      name: req.body.name,
+      username: req.body.username,
       email: req.body.email,
       phone: req.body.phone,
       profileImg: req.body.profileImg,
