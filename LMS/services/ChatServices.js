@@ -3,8 +3,8 @@ const Chat = require("../models/ChatModel");
 const Message = require("../models/MessageModel");
 
 //@desc create a chat room between 2 users
-//@route POST /api/v1/chat\:receiverId
-//@access protected
+//@route POST /api/v1/chat/:receiverId
+//@access protected       => Tested successfully on postman by Paula.
 exports.createChat = asyncHandler(async (req, res, next) => {
   const senderId = req.user._id;
   const { receiverId } = req.params;
@@ -13,19 +13,18 @@ exports.createChat = asyncHandler(async (req, res, next) => {
     participants: [
       {
         userId: senderId,
-        isAdmin: false,
       },
       {
         userId: receiverId,
-        isAdmin: false,
       },
     ],
   });
+
   res.status(201).json({ data: newChat });
 });
 
 //@desc create a group chat
-//@route POST /api/v1/chat\group
+//@route POST /api/v1/chat/group
 //@access protected       => Tested successfully on postman by Paula.
 exports.createGroupChat = asyncHandler(async (req, res, next) => {
   const { participantIds, groupName, description } = req.body;
