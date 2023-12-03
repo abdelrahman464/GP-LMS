@@ -27,23 +27,42 @@ exports.createChat = asyncHandler(async (req, res, next) => {
 //@route POST /api/v1/chat\group
 //@access protected
 exports.createGroupChat = asyncHandler(async (req, res, next) => {
-  const creatorId = req.user._id;
-  console.log(`user id  => ${req.user}`);
-  const { participantIds, groupName, description } = req.body; // Changed memberIds to participantIds
+  const { participantIds, groupName, description } = req.body;
 
-  const allParticipants = [
-    ...new Set([...participantIds, { userId: creatorId, isAdmin: true }]),
-  ];
+ 
 
+  const creator = {
+    userId: req.user._id.toString(),
+    isAdmin: "true",
+  };
+  participantIds.push(creator)
+  console.log(participantIds);
   const newGroupChat = await Chat.create({
-    participants: allParticipants,
+    participants: participantIds,
     isGroupChat: true,
-    creator: creatorId,
+    creator: req.user._id,
     groupName,
     description,
   });
-
   res.status(201).json({ data: newGroupChat });
+
+  // const creatorId = req.user._id;
+  // console.log(creatorId);
+  // const { participantIds, groupName, description } = req.body; // Changed memberIds to participantIds
+
+  // const allParticipants = [
+  //   ...new Set([...participantIds, { userId: creatorId, isAdmin: true }]),
+  // ];
+
+  // const newGroupChat = await Chat.create({
+  //   participants: allParticipants,
+  //   isGroupChat: true,
+  //   creator: creatorId,
+  //   groupName,
+  //   description,
+  // });
+
+  // res.status(201).json({ data: newGroupChat });
 });
 
 //@desc Get group chats of the logged-in user with detailed participant information
@@ -145,7 +164,6 @@ exports.removeParticipantFromChat = asyncHandler(async (req, res, next) => {
 exports.updateParticipantRoleInChat = asyncHandler(async (req, res, next) => {
   const { userId, isAdmin } = req.body; // Chat ID, User ID, and desired role
   const { chatId } = req.params;
-
 
   const chat = await Chat.findById(chatId);
   if (!chat) {

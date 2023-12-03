@@ -20,9 +20,9 @@ const {
 const authServices = require("../services/authServices");
 
 const router = express.Router();
+router.post("/group", authServices.protect, createGroupChat);
 
 router.post("/:receiverId", authServices.protect, createChat);
-router.post("/group", authServices.protect, createGroupChat);
 router.get("/myChats", authServices.protect, getMyChats);
 router.get("/find/:secondPersonId", authServices.protect, findChat);
 

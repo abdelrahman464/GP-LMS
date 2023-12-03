@@ -14,6 +14,18 @@ const chatSchema = new mongoose.Schema(
         },
       },
     ],
+    /////////////////////////////////////////////
+    // participants: [
+    //   {
+    //     type: mongoose.Schema.Types.ObjectId,
+    //     ref: "User",
+    //   },
+    // ],
+    // isAdmin: {
+    //   type: Boolean,
+    //   default: false,
+    // },
+    //////////////////////////////////////////////////////
     isGroupChat: {
       type: Boolean,
       default: false,
@@ -38,5 +50,5 @@ const chatSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-const Chat = mongoose.model("Chat", chatSchema);
-module.exports = Chat;
+module.exports = mongoose.model("Chat", chatSchema);
+// module.exports = Chat;
