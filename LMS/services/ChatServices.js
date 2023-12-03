@@ -47,7 +47,7 @@ exports.createGroupChat = asyncHandler(async (req, res, next) => {
 
 //@desc Get group chats of the logged-in user with detailed participant information
 //@route GET /api/v1/chat/loggedUserGroupChats
-//@access protected
+//@access protected       => Tested successfully on postman by Paula.
 exports.getLoggedUserGroupChats = asyncHandler(async (req, res, next) => {
   const loggedUserId = req.user._id;
 
@@ -62,6 +62,7 @@ exports.getLoggedUserGroupChats = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({ data: groupChats });
 });
+
 //@desc Get chats of the logged-in user excluding direct one-on-one chats
 //@route GET /api/v1/chat/loggedUserChats
 //@access protected
