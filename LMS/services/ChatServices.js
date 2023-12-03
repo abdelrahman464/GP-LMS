@@ -23,18 +23,19 @@ exports.createChat = asyncHandler(async (req, res, next) => {
   });
   res.status(201).json({ data: newChat });
 });
+
 //@desc create a group chat
 //@route POST /api/v1/chat\group
-//@access protected
+//@access protected       => Tested successfully on postman by Paula.
 exports.createGroupChat = asyncHandler(async (req, res, next) => {
   const { participantIds, groupName, description } = req.body;
 
-  const creator = {
+  const groupCreator = {
     userId: req.user._id.toString(),
     isAdmin: "true",
   };
-  participantIds.push(creator);
-  console.log(participantIds);
+  participantIds.push(groupCreator);
+
   const newGroupChat = await Chat.create({
     participants: participantIds,
     isGroupChat: true,
@@ -43,24 +44,6 @@ exports.createGroupChat = asyncHandler(async (req, res, next) => {
     description,
   });
   res.status(201).json({ data: newGroupChat });
-
-  // const creatorId = req.user._id;
-  // console.log(creatorId);
-  // const { participantIds, groupName, description } = req.body; // Changed memberIds to participantIds
-
-  // const allParticipants = [
-  //   ...new Set([...participantIds, { userId: creatorId, isAdmin: true }]),
-  // ];
-
-  // const newGroupChat = await Chat.create({
-  //   participants: allParticipants,
-  //   isGroupChat: true,
-  //   creator: creatorId,
-  //   groupName,
-  //   description,
-  // });
-
-  // res.status(201).json({ data: newGroupChat });
 });
 
 //@desc Get group chats of the logged-in user with detailed participant information
