@@ -29,13 +29,11 @@ exports.createChat = asyncHandler(async (req, res, next) => {
 exports.createGroupChat = asyncHandler(async (req, res, next) => {
   const { participantIds, groupName, description } = req.body;
 
- 
-
   const creator = {
     userId: req.user._id.toString(),
     isAdmin: "true",
   };
-  participantIds.push(creator)
+  participantIds.push(creator);
   console.log(participantIds);
   const newGroupChat = await Chat.create({
     participants: participantIds,
