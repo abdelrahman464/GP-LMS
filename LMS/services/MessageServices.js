@@ -2,7 +2,7 @@ const asyncHandler = require("express-async-handler");
 const Message = require("../models/MessageModel");
 
 //@desc add a message to chat
-//@route POST /api/v1/message\:chatId
+//@route POST /api/v1/message/:messageId
 //@access protected
 exports.addMessage = asyncHandler(async (req, res) => {
   const { chatId } = req.params;
