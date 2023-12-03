@@ -3,8 +3,8 @@ const Chat = require("../models/ChatModel");
 const Message = require("../models/MessageModel");
 
 //@desc create a chat room between 2 users
-//@route POST /api/v1/chat\:receiverId
-//@access protected
+//@route POST /api/v1/chat/:receiverId
+//@access protected       => Tested successfully on postman by Paula.
 exports.createChat = asyncHandler(async (req, res, next) => {
   const senderId = req.user._id;
   const { receiverId } = req.params;
@@ -13,42 +13,41 @@ exports.createChat = asyncHandler(async (req, res, next) => {
     participants: [
       {
         userId: senderId,
-        isAdmin: false,
       },
       {
         userId: receiverId,
-        isAdmin: false,
       },
     ],
   });
+
   res.status(201).json({ data: newChat });
 });
-//@desc create a group chat
-//@route POST /api/v1/chat\group
-//@access protected
-exports.createGroupChat = asyncHandler(async (req, res, next) => {
-  const creatorId = req.user._id;
-  console.log(`user id  => ${req.user}`);
-  const { participantIds, groupName, description } = req.body; // Changed memberIds to participantIds
 
-  const allParticipants = [
-    ...new Set([...participantIds, { userId: creatorId, isAdmin: true }]),
-  ];
+//@desc create a group chat
+//@route POST /api/v1/chat/group
+//@access protected       => Tested successfully on postman by Paula.
+exports.createGroupChat = asyncHandler(async (req, res, next) => {
+  const { participantIds, groupName, description } = req.body;
+
+  const groupCreator = {
+    userId: req.user._id.toString(),
+    isAdmin: "true",
+  };
+  participantIds.push(groupCreator);
 
   const newGroupChat = await Chat.create({
-    participants: allParticipants,
+    participants: participantIds,
     isGroupChat: true,
-    creator: creatorId,
+    creator: req.user._id,
     groupName,
     description,
   });
-
   res.status(201).json({ data: newGroupChat });
 });
 
 //@desc Get group chats of the logged-in user with detailed participant information
 //@route GET /api/v1/chat/loggedUserGroupChats
-//@access protected
+//@access protected       => Tested successfully on postman by Paula.
 exports.getLoggedUserGroupChats = asyncHandler(async (req, res, next) => {
   const loggedUserId = req.user._id;
 
@@ -63,6 +62,7 @@ exports.getLoggedUserGroupChats = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({ data: groupChats });
 });
+
 //@desc Get chats of the logged-in user excluding direct one-on-one chats
 //@route GET /api/v1/chat/loggedUserChats
 //@access protected
@@ -145,7 +145,6 @@ exports.removeParticipantFromChat = asyncHandler(async (req, res, next) => {
 exports.updateParticipantRoleInChat = asyncHandler(async (req, res, next) => {
   const { userId, isAdmin } = req.body; // Chat ID, User ID, and desired role
   const { chatId } = req.params;
-
 
   const chat = await Chat.findById(chatId);
   if (!chat) {
