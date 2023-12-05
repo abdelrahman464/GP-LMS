@@ -1,5 +1,8 @@
 const path = require("path");
+const http = require("http");
+
 const express = require("express");
+
 const mongoose = require("mongoose");
 //middleware
 const morgan = require("morgan");
@@ -15,6 +18,7 @@ dotenv.config({ path: "config.env" });
 
 //database
 const dbConnection = require("./config/database");
+const socketIOServer = require("./socket/socketio-server");
 //route
 
 const mountRoutes = require("./Routers");
@@ -29,8 +33,18 @@ const globalError = require("./middlewares/errorMiddleware");
 //connect with database
 dbConnection();
 mongoose.set("strictQuery", false);
+
 //express app
 const app = express();
+const CompleteServer = http.createServer(app);
+
+// Integrate Socket.IO with the HTTP server
+socketIOServer.attach(CompleteServer, {
+  cors: {
+    origin: "http://localhost:3000",
+  },
+});
+
 //enable other domains access your application
 app.use(cors());
 app.options("*", cors());
@@ -84,7 +98,7 @@ app.all("*", (req, res, next) => {
 app.use(globalError);
 
 const PORT = process.env.PORT || 8000;
-const server = app.listen(PORT, () => {
+const server = CompleteServer.listen(PORT, () => {
   console.log(`app running on ${PORT}`);
 });
 
