@@ -24,7 +24,7 @@ const userShcema = mongoose.Schema(
     passwordResetVerified: Boolean,
     role: {
       type: String,
-      enum: ["user", "instractor", "admin"],
+      enum: ["user", "instructor", "admin"],
       default: "user",
     },
     profileImg: String,
