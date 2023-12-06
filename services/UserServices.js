@@ -10,13 +10,13 @@ const { uploadSingleImage } = require("../middlewares/uploadImageMiddleware");
 
 //upload Singel image
 exports.uploadProfileImage = uploadSingleImage("profileImg");
+
 //image processing
 exports.resizeImage = asyncHandler(async (req, res, next) => {
   const filename = `user-${uuidv4()}-${Date.now()}.jpeg`;
 
   if (req.file) {
     await sharp(req.file.buffer)
-      
       .toFormat("jpeg")
       .jpeg({ quality: 98 })
       .toFile(`uploads/users/${filename}`);
@@ -27,18 +27,22 @@ exports.resizeImage = asyncHandler(async (req, res, next) => {
 
   next();
 });
+
 //@desc get list of user
 //@route GET /api/v1/users
 //@access private
 exports.getUsers = factory.getALl(User);
+
 //@desc get specific User by id
 //@route GET /api/v1/User/:id
 //@access private
 exports.getUser = factory.getOne(User);
+
 //@desc create user
 //@route POST /api/v1/users
 //@access private
 exports.createUser = factory.createOne(User);
+
 //@desc update specific user
 //@route PUT /api/v1/user/:id
 //@access private
@@ -79,10 +83,12 @@ exports.changeUserPassword = asyncHandler(async (req, res, next) => {
   }
   res.status(200).json({ data: user });
 });
+
 //@desc delete User
 //@route DELETE /api/v1/user/:id
 //@access private
 exports.deleteUser = factory.deleteOne(User);
+
 //@desc get logged user data
 //@route GET /api/v1/user/getMe
 //@access private/protect
@@ -91,6 +97,7 @@ exports.getLoggedUserData = asyncHandler(async (req, res, next) => {
   req.params.id = req.user._id;
   next();
 });
+
 //@desc update logged user password
 //@route PUT /api/v1/user/changeMyPassword
 //@access private/protect
@@ -111,6 +118,7 @@ exports.updateLoggedUserPassword = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({ data: user, token });
 });
+
 //@desc update logged user data without updating password or role
 //@route PUT /api/v1/user/changeMyData
 //@access private/protect
@@ -129,4 +137,3 @@ exports.updateLoggedUserData = asyncHandler(async (req, res, next) => {
   );
   res.status(200).json({ data: user });
 });
-

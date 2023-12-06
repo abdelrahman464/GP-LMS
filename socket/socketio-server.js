@@ -6,7 +6,9 @@ const io = new Server();
 
 // Store active users and their sockets
 let activeUsers = [];
+
 // Store active group chats
+// eslint-disable-next-line prefer-const
 let groupChats = [];
 
 io.on("connection", (socket) => {
@@ -42,7 +44,9 @@ io.on("connection", (socket) => {
       const groupChat = groupChats.find((chat) => chat.id === receiverId);
       if (groupChat) {
         groupChat.members.forEach((member) => {
-          const user = activeUsers.find((user) => user.userId === member.userId);
+          const user = activeUsers.find(
+            (user) => user.userId === member.userId
+          );
           if (user) {
             io.to(user.socketId).emit("receive-group-message", message);
           }
