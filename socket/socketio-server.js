@@ -1,5 +1,3 @@
-/* eslint-disable no-shadow */
-
 const { Server } = require("socket.io");
 
 const io = new Server();
@@ -19,7 +17,6 @@ io.on("connection", (socket) => {
         socketId: socket.id,
       });
     }
-    console.log("Connected Users", activeUsers);
 
     // Send all active users to new user
     io.emit("get-users", activeUsers);
@@ -27,12 +24,11 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     activeUsers = activeUsers.filter((user) => user.socketId !== socket.id);
-    console.log("User Disconnected", activeUsers);
     io.emit("get-users", activeUsers);
   });
 
   socket.on("send-message", (data) => {
-    const { receiverId, chatType, message } = data;
+    const { receiverId, chatType, message, senderId } = data;
 
     if (chatType === "user") {
       const user = activeUsers.find((user) => user.userId === receiverId);
@@ -44,11 +40,11 @@ io.on("connection", (socket) => {
       const groupChat = groupChats.find((chat) => chat.id === receiverId);
       if (groupChat) {
         groupChat.members.forEach((member) => {
-          const user = activeUsers.find(
-            (user) => user.userId === member.userId
-          );
+          const user = activeUsers.find((user) => user.userId === member);
           if (user) {
-            io.to(user.socketId).emit("receive-group-message", message);
+            console.log("in user", user);
+            if (user.userId !== senderId)
+              io.to(user.socketId).emit("receive-group-message", message);
           }
         });
       }
@@ -58,12 +54,14 @@ io.on("connection", (socket) => {
   // Create a new group chat
   socket.on("create-group-chat", (chatData) => {
     const { chatId, members } = chatData;
+    groupChats = groupChats.filter((chat) => chat.id !== chatId);
     groupChats.push({ id: chatId, members });
   });
 
   // Add a user to an existing group chat
   socket.on("add-user-to-group-chat", (data) => {
     const { chatId, userId } = data;
+
     const groupChat = groupChats.find((chat) => chat.id === chatId);
     if (groupChat) {
       groupChat.members.push({ userId });
