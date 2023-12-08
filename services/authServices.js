@@ -1,11 +1,11 @@
 const crypto = require("crypto");
-const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const asyncHandler = require("express-async-handler");
 const User = require("../models/userModel");
 const ApiError = require("../utils/apiError");
 const sendEmail = require("../utils/sendEmail");
 const generateToken = require("../utils/generateToken");
+const UserAuthorization = require("../middlewares/userAuthorizationMiddleware");
 
 //@desc signup
 //@route POST /api/v1/auth/signup
@@ -22,6 +22,7 @@ exports.signup = asyncHandler(async (req, res, next) => {
 
   res.status(201).json({ data: user, token });
 });
+
 //@desc login
 //@route POST /api/v1/auth/login
 //@access public
@@ -40,49 +41,20 @@ exports.login = asyncHandler(async (req, res, next) => {
 
 //@desc make sure user is logged in
 exports.protect = asyncHandler(async (req, res, next) => {
-  //1- check if token exists, if exist get it
-  let token;
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith("Bearer")
-  ) {
-    token = req.headers.authorization.split(" ")[1];
-  }
-  if (!token) {
-    return next(new ApiError("you are not login,please login first", 401));
-  }
-  //2- verify token (no change happens,expired token)
-  const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
+  const userAuthorization = new UserAuthorization();
 
-  //3-check if user exists
-  const currentUser = await User.findById(decoded.userId);
-  if (!currentUser) {
-    next(new ApiError("user is not available"));
-  }
-  //4-check if user changed password after token generated
-  if (currentUser.passwordChangedAt) {
-    //convert data to timestamp by =>getTime()
-    const passwordChangedTimestamp = parseInt(
-      currentUser.passwordChangedAt.getTime() / 1000,
-      10
-    );
-    //it mean password changer after token generated
-    if (passwordChangedTimestamp > decoded.iat) {
-      return next(
-        new ApiError(
-          "user recently changed his password,please login again",
-          401
-        )
-      );
-    }
-  }
-  //add user to request
-  //to use this in authorization
-  // check if user is already registered
+  const token = userAuthorization.getToken(req.headers.authorization);
+  const decoded = userAuthorization.tokenVerifcation(token);
+  const currentUser = await userAuthorization.checkCurrentUserExist(decoded);
+  userAuthorization.checkUserChangeHisPasswordAfterTokenCreated(
+    currentUser,
+    decoded
+  );
+
   req.user = currentUser;
-
   next();
 });
+
 //@desc  Authorization (user permissions)
 // ....roles => retrun array for example ["admin","manager"]
 exports.allowedTo = (...roles) =>
@@ -96,6 +68,7 @@ exports.allowedTo = (...roles) =>
     }
     next();
   });
+
 //@desc forgot password
 //@route POST /api/v1/auth/forgotPassword
 //@access public
@@ -147,6 +120,7 @@ exports.forgotPassword = asyncHandler(async (req, res, next) => {
     message: `Reset Code Sent Success To ${user.email}`,
   });
 });
+
 //@desc verify reset password code
 //@route POST /api/v1/auth/verifyResetCode
 //@access public
@@ -171,6 +145,7 @@ exports.verifyPassResetCode = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({ status: "success" });
 });
+
 //@desc  reset password
 //@route PUT /api/v1/auth/resetPassword
 //@access public
