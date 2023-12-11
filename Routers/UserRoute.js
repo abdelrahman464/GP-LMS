@@ -21,6 +21,8 @@ const {
   updateLoggedUserData,
   uploadProfileImage,
   resizeImage,
+  deActiveLoggedUser,
+  activeLoggedUser,
 } = require("../services/UserServices");
 
 const router = express.Router();
@@ -41,6 +43,10 @@ router.put(
   updateLoggedUserValidator,
   updateLoggedUserData
 );
+
+router.put("/deActiveMe", authServices.protect, deActiveLoggedUser);
+router.put("/activeMe", activeLoggedUser);
+
 router.put(
   "/changePassword/:id",
   authServices.protect,
