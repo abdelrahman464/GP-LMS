@@ -37,6 +37,16 @@ class UserAuthorization {
     return currentUser;
   }
 
+  checkCurrentUserIsActive(currentUser) {
+    if (!currentUser.active) {
+      throw new ApiError(
+        "The user that belong to this token not active, please activate your account",
+        401
+      );
+    }
+    return true;
+  }
+
   //  4) check if user chnage his password after token created
   checkUserChangeHisPasswordAfterTokenCreated(currentUser, decoded) {
     if (currentUser.passwordChangedAt) {

@@ -46,6 +46,7 @@ exports.protect = asyncHandler(async (req, res, next) => {
   const token = userAuthorization.getToken(req.headers.authorization);
   const decoded = userAuthorization.tokenVerifcation(token);
   const currentUser = await userAuthorization.checkCurrentUserExist(decoded);
+  userAuthorization.checkCurrentUserIsActive(currentUser);
   userAuthorization.checkUserChangeHisPasswordAfterTokenCreated(
     currentUser,
     decoded

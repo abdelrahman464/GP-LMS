@@ -27,10 +27,15 @@ const userShcema = mongoose.Schema(
       enum: ["user", "instructor", "admin"],
       default: "user",
     },
+    active: {
+      type: Boolean,
+      default: true,
+    },
     profileImg: String,
     about: String,
     country: String,
   },
+
   { timestamps: true }
 );
 userShcema.pre("save", async function (next) {
