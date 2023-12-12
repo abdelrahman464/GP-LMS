@@ -17,15 +17,15 @@ exports.addMessage = asyncHandler(async (req, res) => {
     return res.status(404).json({ error: "Chat not found" });
   }
 
-  const participantIds = chat.participants.map((participant) =>
-    String(participant.userId)
-  );
+ // const participantIds = chat.participants.map((participant) =>
+ //   String(participant.userId)
+//  );
 
-  if (!participantIds.includes(String(senderId))) {
-    return res.status(403).json({
-      error: "Unauthorized access: You are not a participant of this chat",
-    });
-  }
+//  if (!participantIds.includes(String(senderId))) {
+//    return res.status(403).json({
+//      error: "Unauthorized access: You are not a participant of this chat",
+//    });
+//  }
 
   // Create a new message
   const message = new Message({
