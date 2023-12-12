@@ -49,11 +49,28 @@ const MessageSchema = new mongoose.Schema(
   { timestamps: true }
 );
 MessageSchema.pre(/^find/, function (next) {
-  this.populate({ path: "forwardedFrom", select: "username profileImg" })
-    .populate({ path: "reactions", select: "username profileImg" })
-    .populate({ path: "senderId", select: "username profileImg" })
-    .populate({ path: "repliedTo", select: "username text media" });
+  this.populate({
+    path: "forwardedFrom",
+    select: "username profileImg",
+  })
+    .populate({
+      path: "reactions",
+      select: "username profileImg",
+    })
+    .populate({
+      path: "senderId",
+      select: "username profileImg",
+    })
+    .populate({
+      path: "repliedTo", // Populate repliedTo field
+      select: "senderId text media",
+      populate: {
+        path: "senderId", // Populate senderId within repliedTo field
+        select: "username profileImg",
+      },
+    });
   next();
 });
+
 const Message = mongoose.model("Message", MessageSchema);
 module.exports = Message;
