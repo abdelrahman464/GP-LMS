@@ -124,7 +124,7 @@ exports.deleteMessage = asyncHandler(async (req, res) => {
 //@desc Add a reaction to a message
 //@route POST /api/v1/message/:messageId/reactions
 //@access protected
-exports.addReactionToMessage = asyncHandler(async (req, res) => {
+exports.toggleReactionToMessage = asyncHandler(async (req, res) => {
   const { messageId } = req.params;
   const { emoji } = req.body;
   const userId = req.user._id; // logged user id
@@ -136,51 +136,29 @@ exports.addReactionToMessage = asyncHandler(async (req, res) => {
   }
 
   // Check if the user has already reacted to this message
-  const existingReaction = message.reactions.find(
+  const existingReactionIndex = message.reactions.findIndex(
     (reaction) => String(reaction.userId) === String(userId)
   );
 
-  if (existingReaction) {
-    return res
-      .status(400)
-      .json({ error: "User has already reacted to this message" });
+  if (existingReactionIndex !== -1) {
+    const existingReaction = message.reactions[existingReactionIndex];
+    if (existingReaction.emoji === emoji) {
+      // If the new reaction is the same as the existing one, remove the reaction
+      message.reactions.splice(existingReactionIndex, 1);
+    } else {
+      // If the new reaction is different, update the existing reaction
+      existingReaction.emoji = emoji;
+    }
+  } else {
+    // If the user has not reacted, add the reaction
+    message.reactions.push({ userId, emoji });
   }
 
-  // Add the reaction to the message
-  message.reactions.push({ userId, emoji });
   await message.save();
 
   res.status(200).json(message);
 });
-//@desc Remove a user's reaction from a message
-//@route DELETE /api/v1/message/:messageId/reactions
-//@access protected
-exports.removeReactionFromMessage = asyncHandler(async (req, res) => {
-  const { messageId } = req.params;
-  const userId = req.user._id;
 
-  const message = await Message.findById(messageId);
-  if (!message) {
-    return res.status(404).json({ error: "Message not found" });
-  }
-
-  // Find the index of the user's reaction
-  const reactionIndex = message.reactions.findIndex(
-    (reaction) => String(reaction.userId) === userId
-  );
-
-  if (reactionIndex === -1) {
-    return res
-      .status(404)
-      .json({ error: "User reaction not found for this message" });
-  }
-
-  // Remove the reaction
-  message.reactions.splice(reactionIndex, 1);
-  await message.save();
-
-  res.status(200).json(message);
-});
 //@desc Reply to a message
 //@route POST /api/v1/message/:messageId/reply
 //@access protected
