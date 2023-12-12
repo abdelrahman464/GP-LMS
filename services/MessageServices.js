@@ -54,7 +54,7 @@ exports.addMessage = asyncHandler(async (req, res) => {
     }
   }
 
-  res.status(200).json({ userChats, lastChatWithLatestMessage });
+  res.status(200).json({ message, lastChatWithLatestMessage });
 });
 
 // exports.addMessage = asyncHandler(async (req, res) => {
