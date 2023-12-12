@@ -1,6 +1,5 @@
 /* eslint-disable no-shadow */
 
-
 const { Server } = require("socket.io");
 //const Chat = require("../models/ChatModel");
 const io = new Server();
@@ -20,6 +19,7 @@ io.on("connection", (socket) => {
         socketId: socket.id,
       });
     }
+    console.log("new user added", activeUsers);
     io.emit("get-users", activeUsers);
   });
   socket.on("new-user-in-chat", (data) => {
@@ -31,21 +31,26 @@ io.on("connection", (socket) => {
       });
     }
   });
-
+  socket.on("user-leave-chat", (data) => {
+    console.log("leaving");
+    usersInChat = usersInChat.filter(
+      (user) => user.userId !== data.user && user.chat !== data.chat
+    );
+  });
   socket.on("disconnect", () => {
     activeUsers = activeUsers.filter((user) => user.socketId !== socket.id);
     io.emit("get-users", activeUsers);
+    console.log("out");
   });
 
   socket.on("send-message", (data) => {
-    const { receiverId, chatType, message, senderId, chatId } = data;
+    const { receiverId, chatType, message, senderId, chatId, type } = data;
     if (chatType === "user") {
       const user = usersInChat.find((user) => user.userId === receiverId);
       if (user) {
         if (user.chat === chatId) {
-          console.log("in user", user);
-          io.to(user.socketId).emit("receive-message", message);
-          
+          console.log(user);
+          io.to(user.socketId).emit("receive-message", { message, type });
         }
       }
     } else if (chatType === "group") {
@@ -53,11 +58,12 @@ io.on("connection", (socket) => {
       const groupChat = groupChats.find((chat) => chat.id === receiverId);
       if (groupChat) {
         groupChat.members.forEach((member) => {
-          const user = activeUsers.find((user) => user.userId === member);
-          if (user) {
-            console.log("in user", user);
-            if (user.userId !== senderId)
-              io.to(user.socketId).emit("receive-group-message", message);
+          const user = usersInChat.find((user) => user.userId === member);
+          if (user && user.userId !== senderId && user.chat === chatId) {
+            io.to(user.socketId).emit("receive-group-message", {
+              message,
+              type,
+            });
           }
         });
       }
@@ -80,7 +86,6 @@ io.on("connection", (socket) => {
       groupChat.members.push({ userId });
     }
   });
-
 });
 
 module.exports = io;
