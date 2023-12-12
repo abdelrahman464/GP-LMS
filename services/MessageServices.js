@@ -17,16 +17,16 @@ exports.addMessage = asyncHandler(async (req, res) => {
     return res.status(404).json({ error: "Chat not found" });
   }
 
-   // Check if the logged-in user is a participant of the chat
-   const participantIds = chat.participants.map((participant) =>
-   String(participant.userId._id)
- );
+  // Check if the logged-in user is a participant of the chat
+  const participantIds = chat.participants.map((participant) =>
+    String(participant.userId._id)
+  );
 
- if (!participantIds.includes(String(senderId))) {
-   return res.status(403).json({
-     error: "Unauthorized access: You are not a participant of this chat",
-   });
- }
+  if (!participantIds.includes(String(senderId))) {
+    return res.status(403).json({
+      error: "Unauthorized access: You are not a participant of this chat",
+    });
+  }
 
   // Create a new message
   const message = new Message({
@@ -112,15 +112,37 @@ exports.getMessage = asyncHandler(async (req, res) => {
   }
 
   // Check if the logged-in user is a participant of the chat
-  const participantIds = chat.participants.map((participant) =>
-    String(participant.userId._id)
-  );
+  const participantIds = [];
+
+  chat.participants.forEach((participant) => {
+    if (participant.userId && participant.userId._id) {
+      participantIds.push(String(participant.userId._id));
+    } else {
+      return res.status(403).json({
+        error: "Unauthorized access: User ID is null",
+      });
+    }
+  });
+
+  // Assuming userId is defined earlier in your code
+  if (userId === null) {
+    return res.status(403).json({
+      error: "Unauthorized access: User ID is null",
+    });
+  }
+
+  if (participantIds.length === 0) {
+    return res.status(403).json({
+      error: "Unauthorized access: No participants found in this chat",
+    });
+  }
 
   if (!participantIds.includes(String(userId))) {
     return res.status(403).json({
       error: "Unauthorized access: You are not a participant of this chat",
     });
   }
+
   const messages = await Message.find({ chatId }).populate(
     "senderId",
     "username"
