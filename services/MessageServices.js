@@ -94,30 +94,50 @@ exports.getMessage = asyncHandler(async (req, res) => {
 exports.updateMessage = asyncHandler(async (req, res) => {
   const { messageId } = req.params;
   const { text, media } = req.body;
+  const userId = req.user._id; // logged user id
 
-  const message = await Message.findByIdAndUpdate(
-    messageId,
-    { text, media },
-    { new: true, runValidators: true }
-  );
+  const message = await Message.findById(messageId);
 
   if (!message) {
     return res.status(404).json({ error: "Message not found" });
   }
 
-  res.status(200).json(message);
+  // Check if the logged-in user is the sender of the message
+  if (String(message.senderId) !== String(userId)) {
+    return res
+      .status(403)
+      .json({ error: "Unauthorized access: You cannot update this message" });
+  }
+
+  const updatedMessage = await Message.findByIdAndUpdate(
+    messageId,
+    { text, media },
+    { new: true, runValidators: true }
+  );
+
+  res.status(200).json(updatedMessage);
 });
 //@desc Delete a message by ID
 //@route DELETE /api/v1/message/:messageId
 //@access protected
 exports.deleteMessage = asyncHandler(async (req, res) => {
   const { messageId } = req.params;
+  const userId = req.user._id; // logged user id
 
-  const message = await Message.findByIdAndDelete(messageId);
+  const message = await Message.findById(messageId);
 
   if (!message) {
     return res.status(404).json({ error: "Message not found" });
   }
+
+  // Check if the logged-in user is the sender of the message
+  if (String(message.senderId) !== String(userId)) {
+    return res
+      .status(403)
+      .json({ error: "Unauthorized access: You cannot delete this message" });
+  }
+
+  await Message.findByIdAndDelete(messageId);
 
   res.status(200).json({ message: "Message deleted successfully" });
 });
