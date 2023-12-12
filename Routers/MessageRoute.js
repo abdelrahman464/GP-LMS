@@ -5,7 +5,7 @@ const {
   getMessage,
   updateMessage,
   deleteMessage,
-  addReactionToMessage,
+  toggleReactionToMessage,
   replyToMessage,
   getRepliesToMessage,
   forwardMessage,
@@ -22,7 +22,7 @@ router.delete("/:messageId", authServices.protect, deleteMessage);
 router.post(
   "/:messageId/reactions",
   authServices.protect,
-  addReactionToMessage
+  toggleReactionToMessage
 );
 router.post("/:messageId/reply", authServices.protect, replyToMessage);
 router.get("/:messageId/replies", authServices.protect, getRepliesToMessage);

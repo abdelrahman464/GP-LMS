@@ -233,12 +233,81 @@ exports.deleteChat = asyncHandler(async (req, res, next) => {
 exports.getMyChats = asyncHandler(async (req, res) => {
   const userId = req.user._id; // logged user id
 
-  const chat = await Chat.find({
-    "participants.userId": userId, // Considering the updated schema with 'participants'
-  });
+  const chats = await Chat.aggregate([
+    {
+      $match: {
+        "participants.userId": userId,
+      },
+    },
+    {
+      $lookup: {
+        from: "messages",
+        let: { chatId: "$_id" },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $eq: ["$chatId", "$$chatId"],
+              },
+            },
+          },
+          {
+            $sort: { createdAt: -1 },
+          },
+          {
+            $limit: 1,
+          },
+        ],
+        as: "lastMessage",
+      },
+    },
+    {
+      $addFields: {
+        lastMessage: { $arrayElemAt: ["$lastMessage", 0] },
+      },
+    },
+    {
+      $sort: { "lastMessage.createdAt": -1 },
+    },
+    {
+      $unwind: "$participants" // Unwind participants array
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "participants.userId",
+        foreignField: "_id",
+        as: "participants.userDetails",
+      },
+    },
+    {
+      $addFields: {
+        "participants.username": {
+          $map: {
+            input: "$participants.userDetails",
+            as: "userDetail",
+            in: "$$userDetail.username",
+          },
+        },
+      },
+    },
+    {
+      $project: {
+        "participants.userDetails": 0, // Remove the redundant userDetails field
+      },
+    },
+    {
+      $group: {
+        _id: "$_id",
+        lastMessage: { $first: "$lastMessage" },
+        participants: { $push: "$participants" }, // Reconstruct the participants array
+      },
+    },
+  ]);
 
-  res.status(200).json({ data: chat });
+  res.status(200).json({ data: chats });
 });
+
 
 //@desc Find a specific chat between two users that the logged-in user is part of
 //@route GET /api/v1/chat/find/:secondPersonId
