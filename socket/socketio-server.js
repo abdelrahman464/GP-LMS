@@ -1,7 +1,8 @@
+
 /* eslint-disable no-shadow */
 
 const { Server } = require("socket.io");
-//const Chat = require("../models/ChatModel");
+const Chat = require("../models/ChatModel");
 const io = new Server();
 
 // Store active users and their sockets
@@ -19,7 +20,6 @@ io.on("connection", (socket) => {
         socketId: socket.id,
       });
     }
-    console.log("new user added", activeUsers);
     io.emit("get-users", activeUsers);
   });
   socket.on("new-user-in-chat", (data) => {
@@ -32,7 +32,6 @@ io.on("connection", (socket) => {
     }
   });
   socket.on("user-leave-chat", (data) => {
-    console.log("leaving");
     usersInChat = usersInChat.filter(
       (user) => user.userId !== data.user && user.chat !== data.chat
     );
@@ -40,29 +39,69 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     activeUsers = activeUsers.filter((user) => user.socketId !== socket.id);
     io.emit("get-users", activeUsers);
-    console.log("out");
   });
 
   socket.on("send-message", (data) => {
     const { receiverId, chatType, message, senderId, chatId, type } = data;
     if (chatType === "user") {
+      // send the message
       const user = usersInChat.find((user) => user.userId === receiverId);
       if (user) {
         if (user.chat === chatId) {
-          console.log(user);
           io.to(user.socketId).emit("receive-message", { message, type });
         }
+      }
+      const userToUpdateChat = activeUsers.find(
+        (user) => user.userId === receiverId
+      );
+      if (userToUpdateChat) {
+        io.to(userToUpdateChat.socketId).emit("update-chat", { message, type });
       }
     } else if (chatType === "group") {
       // Find the group chat by its ID
       const groupChat = groupChats.find((chat) => chat.id === receiverId);
       if (groupChat) {
         groupChat.members.forEach((member) => {
+          // send the message
           const user = usersInChat.find((user) => user.userId === member);
-          if (user && user.userId !== senderId && user.chat === chatId) {
-            io.to(user.socketId).emit("receive-group-message", {
+          if (user?.userId !== senderId && user?.chat === chatId) {
+            io.to(user.socketId).emit("receive-message", {
               message,
               type,
+            });
+          }
+          // update the chat
+          const userToUpdateChat = activeUsers.find(
+            (user) => user.userId === member
+          );
+          if (userToUpdateChat && userToUpdateChat?.userId !== senderId) {
+            io.to(userToUpdateChat.socketId).emit("update-chat", {
+              message,
+              type,
+            });
+          }
+        });
+      }
+    }
+  });
+  socket.on("delete-message", (data) => {
+    const { receiverId, chatType, messageId, senderId, chatId } = data;
+    if (chatType === "user") {
+      const user = usersInChat.find((user) => user.userId === receiverId);
+      if (user) {
+        if (user.chat === chatId) {
+          io.to(user.socketId).emit("deleted-message", { messageId });
+        }
+      }
+    } else if (chatType === "group") {
+      const groupChat = groupChats.find((chat) => chat.id === receiverId);
+      if (groupChat) {
+        groupChat.members.forEach((member) => {
+          const user = usersInChat.find((user) => user.userId === member);
+          if (user?.userId !== senderId && user?.chat === chatId) {
+            console.log("sent");
+            io.to(user.socketId).emit("deleted-message", {
+              messageId,
             });
           }
         });
@@ -89,3 +128,5 @@ io.on("connection", (socket) => {
 });
 
 module.exports = io;
+
+
