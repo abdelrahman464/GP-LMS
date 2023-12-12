@@ -17,10 +17,14 @@ exports.addMessage = asyncHandler(async (req, res) => {
     return res.status(404).json({ error: "Chat not found" });
   }
 
-  const participantIds = chat.participants.map(participant => String(participant.userId));
+  const participantIds = chat.participants.map((participant) =>
+    String(participant.userId)
+  );
 
   if (!participantIds.includes(String(senderId))) {
-    return res.status(403).json({ error: "Unauthorized access: You are not a participant of this chat" });
+    return res.status(403).json({
+      error: "Unauthorized access: You are not a participant of this chat",
+    });
   }
 
   // Create a new message
@@ -107,14 +111,21 @@ exports.getMessage = asyncHandler(async (req, res) => {
   }
 
   // Check if the logged-in user is a participant of the chat
-  const participantIds = chat.participants.map(participant => String(participant.userId));
-  
-  if (!participantIds.includes(String(userId))) {
-    return res.status(403).json({ error: "Unauthorized access: You are not a participant of this chat" });
-  }
+  const participantIds = chat.participants.map((participant) =>
+    String(participant.userId._id)
+  );
 
-  const result = await Message.find({ chatId });
-  res.status(200).json(result);
+  if (!participantIds.includes(String(userId))) {
+    return res.status(403).json({
+      error: "Unauthorized access: You are not a participant of this chat",
+    });
+  }
+  const messages = await Message.find({ chatId }).populate(
+    "senderId",
+    "username"
+  ); // Assuming 'senderId' is a reference to the user who sent the message
+
+  res.status(200).json(messages);
 });
 
 //@desc Update a message by ID
@@ -132,11 +143,11 @@ exports.updateMessage = asyncHandler(async (req, res) => {
   }
 
   // Check if the logged-in user is the sender of the message
-  if (String(message.senderId) !== String(userId)) {
-    return res
-      .status(403)
-      .json({ error: "Unauthorized access: You cannot update this message" });
-  }
+  // if (String(message.senderId) !== String(userId)) {
+  //   return res
+  //     .status(403)
+  //     .json({ error: "Unauthorized access: You cannot update this message" });
+  // }
 
   const updatedMessage = await Message.findByIdAndUpdate(
     messageId,
@@ -283,7 +294,7 @@ exports.markMessageAsRead = asyncHandler(async (req, res) => {
   const { messageId } = req.params;
   const userId = req.user._id; // logged user id
 
-  const message = await Message.findById(messageId).populate('chatId');
+  const message = await Message.findById(messageId).populate("chatId");
 
   if (!message) {
     return res.status(404).json({ error: "Message not found" });
@@ -297,22 +308,28 @@ exports.markMessageAsRead = asyncHandler(async (req, res) => {
       message.isRead = true;
       await message.save();
     } else {
-      return res.status(403).json({ error: "Unauthorized access: You cannot mark this message as read" });
+      return res.status(403).json({
+        error: "Unauthorized access: You cannot mark this message as read",
+      });
     }
   } else {
     // Group chat
     const chat = message.chatId;
-    const participants = chat.participants.map(participant => participant.userId);
+    const participants = chat.participants.map(
+      (participant) => participant.userId
+    );
 
     if (!message.seenBy.includes(userId)) {
       // If the user is not in seenBy array, add the user to seenBy array
       message.seenBy.push(userId);
       await message.save();
 
-      const seenParticipants = message.seenBy.map(seenId => String(seenId));
+      const seenParticipants = message.seenBy.map((seenId) => String(seenId));
 
       // Check if all participants have seen the message
-      const allParticipantsSeen = participants.every(participantId => seenParticipants.includes(String(participantId)));
+      const allParticipantsSeen = participants.every((participantId) =>
+        seenParticipants.includes(String(participantId))
+      );
 
       if (allParticipantsSeen) {
         // All participants have seen the message, mark the message as read
