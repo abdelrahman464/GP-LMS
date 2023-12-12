@@ -29,6 +29,6 @@ router.post("/:messageId/reply", authServices.protect, replyToMessage);
 router.get("/:messageId/replies", authServices.protect, getRepliesToMessage);
 router.post("/:messageId/forward", authServices.protect, forwardMessage);
 router.get("/:messageId/forwarded", authServices.protect, getForwardedMessages);
-router.get("/:messageId/markasread", authServices.protect, markMessageAsRead);
+router.put("/:messageId/markasread", authServices.protect, markMessageAsRead);
 
 module.exports = router;
