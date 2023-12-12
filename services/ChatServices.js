@@ -277,43 +277,46 @@ exports.getMyChats = asyncHandler(async (req, res) => {
         from: "users",
         localField: "participants.userId",
         foreignField: "_id",
-        as: "participants.userDetails",
+        as: "userDetails",
       },
     },
     {
       $addFields: {
-        "participants.username": {
-          $map: {
-            input: "$participants.userDetails",
-            as: "userDetail",
-            in: "$$userDetail.username",
-          },
-        },
-        "participants.profileImg": {
-          $map: {
-            input: "$participants.userDetails",
-            as: "userDetail",
-            in: "$$userDetail.profileImg",
-          },
-        },
+        "participants.username": { $arrayElemAt: ["$userDetails.username", 0] },
+        "participants.profileImg": { $arrayElemAt: ["$userDetails.profileImg", 0] },
       },
     },
     {
       $project: {
-        "participants.userDetails": 0, // Remove the redundant userDetails field
+        userDetails: 0, // Remove the redundant userDetails field
       },
     },
     {
       $group: {
         _id: "$_id",
+        chatDetails: { $first: "$$ROOT" }, // Preserve the chat details
         lastMessage: { $first: "$lastMessage" },
         participants: { $push: "$participants" }, // Reconstruct the participants array
+      },
+    },
+    {
+      $replaceRoot: {
+        newRoot: {
+          $mergeObjects: ["$chatDetails", { lastMessage: "$lastMessage", participants: "$participants" }],
+        },
+      },
+    },
+    {
+      $project: {
+        chatDetails: 0, // Remove the redundant chatDetails field
       },
     },
   ]);
 
   res.status(200).json({ data: chats });
 });
+
+
 
 
 //@desc Find a specific chat between two users that the logged-in user is part of
