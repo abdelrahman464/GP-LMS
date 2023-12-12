@@ -41,7 +41,7 @@ const CompleteServer = http.createServer(app);
 // Integrate Socket.IO with the HTTP server
 socketIOServer.attach(CompleteServer, {
   cors: {
-    origin: "http://localhost:3000",
+    origin: "https://testing-chat-app.vercel.app",
   },
 });
 

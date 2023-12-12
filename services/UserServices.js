@@ -7,6 +7,7 @@ const factory = require("./handllerFactory");
 const User = require("../models/userModel");
 const generateToken = require("../utils/generateToken");
 const { uploadSingleImage } = require("../middlewares/uploadImageMiddleware");
+const UserAuthorization = require("../middlewares/userAuthorizationMiddleware");
 
 //upload Singel image
 exports.uploadProfileImage = uploadSingleImage("profileImg");
@@ -136,4 +137,35 @@ exports.updateLoggedUserData = asyncHandler(async (req, res, next) => {
     }
   );
   res.status(200).json({ data: user });
+});
+
+// @desc    Deactivate Logged user
+// @route   PUT /api/v1/users/deActiveMe
+// @access  Private/protected
+exports.deActiveLoggedUser = asyncHandler(async (req, res, next) => {
+  await User.findByIdAndUpdate(req.user._id, { active: false });
+
+  res.status(204).json({ status: "success" });
+});
+
+// @desc    Activate Logged user
+// @route   PUT /api/v1/users/activeMe
+// @access  Private/protected
+exports.activeLoggedUser = asyncHandler(async (req, res, next) => {
+  const userAuthorization = new UserAuthorization();
+
+  const token = userAuthorization.getToken(req.headers.authorization);
+  const decoded = userAuthorization.tokenVerifcation(token);
+  const currentUser = await userAuthorization.checkCurrentUserExist(decoded);
+  // console.log(currentUser);
+  if (!currentUser.active) {
+    // return next(new ApiError("Your Account is already active", 400));
+    await User.findByIdAndUpdate(currentUser._id, { active: true });
+
+    res.status(200).json({ data: "Your account has been activated" });
+  }
+
+  // await User.findByIdAndUpdate(currentUser._id, { active: true });
+
+  // res.status(200).json({ data: "Your account has been activated" });
 });
