@@ -9,15 +9,21 @@ exports.createChat = asyncHandler(async (req, res, next) => {
   const senderId = req.user._id;
   const { receiverId } = req.params;
 
+  // Check if a chat already exists between sender and receiver
+  const existingChat = await Chat.findOne({
+    participants: {
+      $all: [{ userId: senderId }, { userId: receiverId }],
+    },
+  });
+
+  if (existingChat) {
+    return res
+      .status(400)
+      .json({ error: "Chat already exists between these users" });
+  }
+
   const newChat = await Chat.create({
-    participants: [
-      {
-        userId: senderId,
-      },
-      {
-        userId: receiverId,
-      },
-    ],
+    participants: [{ userId: senderId }, { userId: receiverId }],
   });
 
   res.status(201).json({ data: newChat });
@@ -62,10 +68,10 @@ exports.createGroupChat = asyncHandler(async (req, res, next) => {
 
 //   res.status(200).json({ data: groupChats });
 // });
- 
+
 //@desc Get chats of the logged-in user excluding direct one-on-one chats
 //@route GET /api/v1/chat/loggedUserChats
-//@access protected   
+//@access protected
 // exports.getLoggedUserChats = asyncHandler(async (req, res, next) => {
 //   const loggedUserId = req.user._id;
 
@@ -101,7 +107,9 @@ exports.addParticipantToChat = asyncHandler(async (req, res, next) => {
   );
 
   if (!loggedUser || !loggedUser.isAdmin) {
-    return res.status(403).json({ error: "Unauthorized: You are not an admin in this chat" });
+    return res
+      .status(403)
+      .json({ error: "Unauthorized: You are not an admin in this chat" });
   }
 
   // Check if the user is already a participant in the chat
