@@ -18,6 +18,7 @@ const router = express.Router();
 
 router.post("/:chatId", authServices.protect, addMessage);
 router.get("/:chatId", authServices.protect, getMessage);
+
 router.put("/:messageId", authServices.protect, updateMessage);
 router.delete("/:messageId", authServices.protect, deleteMessage);
 router.post(

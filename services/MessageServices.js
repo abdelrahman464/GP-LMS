@@ -17,15 +17,16 @@ exports.addMessage = asyncHandler(async (req, res) => {
     return res.status(404).json({ error: "Chat not found" });
   }
 
- // const participantIds = chat.participants.map((participant) =>
- //   String(participant.userId)
-//  );
+   // Check if the logged-in user is a participant of the chat
+   const participantIds = chat.participants.map((participant) =>
+   String(participant.userId._id)
+ );
 
-//  if (!participantIds.includes(String(senderId))) {
-//    return res.status(403).json({
-//      error: "Unauthorized access: You are not a participant of this chat",
-//    });
-//  }
+ if (!participantIds.includes(String(senderId))) {
+   return res.status(403).json({
+     error: "Unauthorized access: You are not a participant of this chat",
+   });
+ }
 
   // Create a new message
   const message = new Message({
@@ -37,24 +38,24 @@ exports.addMessage = asyncHandler(async (req, res) => {
   // Save the message
   await message.save();
 
-  // Retrieve all chats of the user
-  const userChats = await Chat.find({ "participants.userId": senderId });
+  // // Retrieve all chats of the user
+  // const userChats = await Chat.find({ "participants.userId": senderId });
 
-  // Find the last chat that contains the latest message
-  let lastChatWithLatestMessage = null;
-  let latestMessageTimestamp = 0;
+  // // Find the last chat that contains the latest message
+  // let lastChatWithLatestMessage = null;
+  // let latestMessageTimestamp = 0;
 
-  for (const chat of userChats) {
-    if (
-      chat.lastMessage &&
-      chat.lastMessage.createdAt > latestMessageTimestamp
-    ) {
-      latestMessageTimestamp = chat.lastMessage.createdAt;
-      lastChatWithLatestMessage = chat;
-    }
-  }
+  // for (const chat of userChats) {
+  //   if (
+  //     chat.lastMessage &&
+  //     chat.lastMessage.createdAt > latestMessageTimestamp
+  //   ) {
+  //     latestMessageTimestamp = chat.lastMessage.createdAt;
+  //     lastChatWithLatestMessage = chat;
+  //   }
+  // }
 
-  res.status(200).json( message);
+  res.status(200).json(message);
 });
 
 // exports.addMessage = asyncHandler(async (req, res) => {
@@ -135,7 +136,8 @@ exports.updateMessage = asyncHandler(async (req, res) => {
   const { messageId } = req.params;
   const { text, media } = req.body;
   const userId = req.user._id; // logged user id
-
+  console.log(messageId);
+  console.log(req.body);
   const message = await Message.findById(messageId);
 
   if (!message) {
@@ -143,16 +145,16 @@ exports.updateMessage = asyncHandler(async (req, res) => {
   }
 
   // Check if the logged-in user is the sender of the message
-  // if (String(message.senderId) !== String(userId)) {
-  //   return res
-  //     .status(403)
-  //     .json({ error: "Unauthorized access: You cannot update this message" });
-  // }
+  if (String(message.senderId._id) !== String(userId)) {
+    return res
+      .status(403)
+      .json({ error: "Unauthorized access: You cannot update this message" });
+  }
 
   const updatedMessage = await Message.findByIdAndUpdate(
     messageId,
     { text, media },
-    { new: true, runValidators: true }
+    { new: true }
   );
 
   res.status(200).json(updatedMessage);
@@ -171,7 +173,7 @@ exports.deleteMessage = asyncHandler(async (req, res) => {
   }
 
   // Check if the logged-in user is the sender of the message
-  if (String(message.senderId) !== String(userId)) {
+  if (String(message.senderId._id) !== String(userId)) {
     return res
       .status(403)
       .json({ error: "Unauthorized access: You cannot delete this message" });
