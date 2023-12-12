@@ -21,6 +21,13 @@ const MessageSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    seendBy: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+
     reactions: [
       {
         userId: {

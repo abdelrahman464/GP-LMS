@@ -4,13 +4,13 @@ const {
   findChat,
   getMyChats,
   createGroupChat,
-  getLoggedUserGroupChats,
-  getLoggedUserChats,
+  // getLoggedUserGroupChats,
+  // getLoggedUserChats,
   addParticipantToChat,
   removeParticipantFromChat,
   updateParticipantRoleInChat,
   getChatDetails,
-  updateChat,
+  updateGrpupChat,
   deleteChat,
   pinMessageInChat,
   unpinMessageInChat,
@@ -27,12 +27,12 @@ router.post("/:receiverId", authServices.protect, createChat);
 router.get("/myChats", authServices.protect, getMyChats);
 router.get("/find/:secondPersonId", authServices.protect, findChat);
 
-router.get(
-  "/loggedUserGroupChats",
-  authServices.protect,
-  getLoggedUserGroupChats
-);
-router.get("/loggedUserChats", authServices.protect, getLoggedUserChats);
+// router.get(
+//   "/loggedUserGroupChats",
+//   authServices.protect,
+//   getLoggedUserGroupChats
+// );
+// router.get("/loggedUserChats", authServices.protect, getLoggedUserChats);
 router.put(
   "/:chatId/addParticipant",
   authServices.protect,
@@ -49,7 +49,7 @@ router.put(
   updateParticipantRoleInChat
 );
 router.get("/:chatId/details", authServices.protect, getChatDetails);
-router.put("/:chatId/update", authServices.protect, updateChat);
+router.put("/:chatId/updateGroup", authServices.protect, updateGrpupChat);
 router.delete("/:chatId", authServices.protect, deleteChat);
 router.post("/:chatId/pin/:messageId", authServices.protect, pinMessageInChat);
 router.delete(

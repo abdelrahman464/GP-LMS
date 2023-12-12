@@ -48,38 +48,38 @@ exports.createGroupChat = asyncHandler(async (req, res, next) => {
 //@desc Get group chats of the logged-in user with detailed participant information
 //@route GET /api/v1/chat/loggedUserGroupChats
 //@access protected       => Tested successfully on postman by Paula.
-exports.getLoggedUserGroupChats = asyncHandler(async (req, res, next) => {
-  const loggedUserId = req.user._id;
+// exports.getLoggedUserGroupChats = asyncHandler(async (req, res, next) => {
+//   const loggedUserId = req.user._id;
 
-  // Find group chats where the logged-in user is a participant
-  const groupChats = await Chat.find({
-    isGroupChat: true, // Assuming isGroupChat differentiates group chats from direct chats
-    "participants.userId": loggedUserId,
-  }).populate({
-    path: "participants.userId",
-    select: "username",
-  });
+//   // Find group chats where the logged-in user is a participant
+//   const groupChats = await Chat.find({
+//     isGroupChat: true, // Assuming isGroupChat differentiates group chats from direct chats
+//     "participants.userId": loggedUserId,
+//   }).populate({
+//     path: "participants.userId",
+//     select: "username",
+//   });
 
-  res.status(200).json({ data: groupChats });
-});
-
+//   res.status(200).json({ data: groupChats });
+// });
+ 
 //@desc Get chats of the logged-in user excluding direct one-on-one chats
 //@route GET /api/v1/chat/loggedUserChats
-//@access protected
-exports.getLoggedUserChats = asyncHandler(async (req, res, next) => {
-  const loggedUserId = req.user._id;
+//@access protected   
+// exports.getLoggedUserChats = asyncHandler(async (req, res, next) => {
+//   const loggedUserId = req.user._id;
 
-  // Find chats where the logged-in user is a participant and it's not a group chat
-  const userChats = await Chat.find({
-    "participants.userId": loggedUserId, // Checking if the logged-in user exists in participants
-    isGroupChat: false, // Filtering out group chats
-  }).populate({
-    path: "participants.userId", // Populating the username from the participants
-    select: "username",
-  });
+//   // Find chats where the logged-in user is a participant and it's not a group chat
+//   const userChats = await Chat.find({
+//     "participants.userId": loggedUserId, // Checking if the logged-in user exists in participants
+//     isGroupChat: false, // Filtering out group chats
+//   }).populate({
+//     path: "participants.userId", // Populating the username from the participants
+//     select: "username",
+//   });
 
-  res.status(200).json({ data: userChats });
-});
+//   res.status(200).json({ data: userChats });
+// });
 
 //@desc Add a participant to a chat with a role
 //@route PUT /api/v1/chat/:chatId/addParticipant
@@ -87,11 +87,21 @@ exports.getLoggedUserChats = asyncHandler(async (req, res, next) => {
 exports.addParticipantToChat = asyncHandler(async (req, res, next) => {
   const { chatId } = req.params;
   const { userId, isAdmin } = req.body; // ID of the participant to be added and their role
+  const loggedUserId = req.user._id; // logged user id
 
   const chat = await Chat.findById(chatId);
 
   if (!chat) {
     return res.status(404).json({ error: "Chat not found" });
+  }
+
+  // Find the logged-in user in the chat to verify admin privileges
+  const loggedUser = chat.participants.find(
+    (participant_) => String(participant_.userId) === String(loggedUserId)
+  );
+
+  if (!loggedUser || !loggedUser.isAdmin) {
+    return res.status(403).json({ error: "Unauthorized: You are not an admin in this chat" });
   }
 
   // Check if the user is already a participant in the chat
@@ -111,6 +121,7 @@ exports.addParticipantToChat = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({ data: chat });
 });
+
 //@desc Remove a participant from a chat
 //@route PUT /api/v1/chat/:chatId/removeParticipant
 //@access protected
@@ -145,23 +156,35 @@ exports.removeParticipantFromChat = asyncHandler(async (req, res, next) => {
 exports.updateParticipantRoleInChat = asyncHandler(async (req, res, next) => {
   const { userId, isAdmin } = req.body; // Chat ID, User ID, and desired role
   const { chatId } = req.params;
+  const loggedUserId = req.user._id; // logged user id
 
   const chat = await Chat.findById(chatId);
   if (!chat) {
     return res.status(404).json({ error: "Chat not found" });
   }
 
-  // Find the participant in the chat
-  const participant = chat.participants.find(
+  // Find the logged-in user in the chat to verify admin privileges
+  const loggedUser = chat.participants.find(
+    (participant_) => String(participant_.userId) === String(loggedUserId)
+  );
+
+  if (!loggedUser || !loggedUser.isAdmin) {
+    return res
+      .status(403)
+      .json({ error: "Unauthorized: You are not an admin in this chat" });
+  }
+
+  // Find the participant to update their role
+  const participantToUpdate = chat.participants.find(
     (participant_) => String(participant_.userId) === userId
   );
 
-  if (!participant) {
+  if (!participantToUpdate) {
     return res.status(404).json({ error: "Participant not found in the chat" });
   }
 
   // Update the participant's role
-  participant.isAdmin = isAdmin;
+  participantToUpdate.isAdmin = isAdmin;
   await chat.save();
 
   res.status(200).json({ data: chat });
@@ -190,22 +213,37 @@ exports.getChatDetails = asyncHandler(async (req, res, next) => {
 //@desc Update chat information (e.g., group name, description)
 //@route PUT /api/v1/chat/:chatId/update
 //@access protected
-exports.updateChat = asyncHandler(async (req, res, next) => {
+exports.updateGrpupChat = asyncHandler(async (req, res, next) => {
   const { chatId } = req.params;
   const { groupName, description } = req.body;
+  const userId = req.user._id; // logged user id
 
-  const chat = await Chat.findByIdAndUpdate(
+  // Check if the logged-in user is an admin in the group
+  const chat = await Chat.findOne({
+    _id: chatId,
+    "participants.userId": userId,
+    "participants.isAdmin": true,
+  });
+
+  if (!chat) {
+    return res
+      .status(403)
+      .json({ error: "Unauthorized: You are not an admin of this group chat" });
+  }
+
+  const updatedChat = await Chat.findByIdAndUpdate(
     chatId,
     { groupName, description },
     { new: true, runValidators: true }
   );
 
-  if (!chat) {
+  if (!updatedChat) {
     return res.status(404).json({ error: "Chat not found" });
   }
 
-  res.status(200).json({ data: chat });
+  res.status(200).json({ data: updatedChat });
 });
+
 //@desc Delete a chat along with associated messages, etc.
 //@route DELETE /api/v1/chat/:chatId
 //@access protected
@@ -270,7 +308,7 @@ exports.getMyChats = asyncHandler(async (req, res) => {
       $sort: { "lastMessage.createdAt": -1 },
     },
     {
-      $unwind: "$participants" // Unwind participants array
+      $unwind: "$participants", // Unwind participants array
     },
     {
       $lookup: {
@@ -283,7 +321,9 @@ exports.getMyChats = asyncHandler(async (req, res) => {
     {
       $addFields: {
         "participants.username": { $arrayElemAt: ["$userDetails.username", 0] },
-        "participants.profileImg": { $arrayElemAt: ["$userDetails.profileImg", 0] },
+        "participants.profileImg": {
+          $arrayElemAt: ["$userDetails.profileImg", 0],
+        },
       },
     },
     {
@@ -302,7 +342,10 @@ exports.getMyChats = asyncHandler(async (req, res) => {
     {
       $replaceRoot: {
         newRoot: {
-          $mergeObjects: ["$chatDetails", { lastMessage: "$lastMessage", participants: "$participants" }],
+          $mergeObjects: [
+            "$chatDetails",
+            { lastMessage: "$lastMessage", participants: "$participants" },
+          ],
         },
       },
     },
@@ -315,9 +358,6 @@ exports.getMyChats = asyncHandler(async (req, res) => {
 
   res.status(200).json({ data: chats });
 });
-
-
-
 
 //@desc Find a specific chat between two users that the logged-in user is part of
 //@route GET /api/v1/chat/find/:secondPersonId

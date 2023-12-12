@@ -10,6 +10,19 @@ exports.addMessage = asyncHandler(async (req, res) => {
   const { text } = req.body;
   const senderId = req.user._id; // logged user id
 
+  // Check if the logged-in user is a participant of the chat
+  const chat = await Chat.findById(chatId);
+
+  if (!chat) {
+    return res.status(404).json({ error: "Chat not found" });
+  }
+
+  const participantIds = chat.participants.map(participant => String(participant.userId));
+
+  if (!participantIds.includes(String(senderId))) {
+    return res.status(403).json({ error: "Unauthorized access: You are not a participant of this chat" });
+  }
+
   // Create a new message
   const message = new Message({
     chatId,
@@ -39,6 +52,7 @@ exports.addMessage = asyncHandler(async (req, res) => {
 
   res.status(200).json({ userChats, lastChatWithLatestMessage });
 });
+
 // exports.addMessage = asyncHandler(async (req, res) => {
 //   const { chatId } = req.params;
 //   const { text } = req.body;
@@ -84,10 +98,25 @@ exports.addMessage = asyncHandler(async (req, res) => {
 //@access protected
 exports.getMessage = asyncHandler(async (req, res) => {
   const { chatId } = req.params;
+  const userId = req.user._id; // logged user id
+
+  const chat = await Chat.findById(chatId);
+
+  if (!chat) {
+    return res.status(404).json({ error: "Chat not found" });
+  }
+
+  // Check if the logged-in user is a participant of the chat
+  const participantIds = chat.participants.map(participant => String(participant.userId));
+  
+  if (!participantIds.includes(String(userId))) {
+    return res.status(403).json({ error: "Unauthorized access: You are not a participant of this chat" });
+  }
 
   const result = await Message.find({ chatId });
   res.status(200).json(result);
 });
+
 //@desc Update a message by ID
 //@route PUT /api/v1/message/:messageId
 //@access protected
@@ -246,4 +275,52 @@ exports.getForwardedMessages = asyncHandler(async (req, res) => {
   const forwardedMessages = await Message.find({ forwardedFrom: userId });
 
   res.status(200).json(forwardedMessages);
+});
+//@desc Mark a message as read in a one-to-one chat or update seenBy in a group chat
+//@route PUT /api/v1/message/:messageId/markasread
+//@access protected
+exports.markMessageAsRead = asyncHandler(async (req, res) => {
+  const { messageId } = req.params;
+  const userId = req.user._id; // logged user id
+
+  const message = await Message.findById(messageId).populate('chatId');
+
+  if (!message) {
+    return res.status(404).json({ error: "Message not found" });
+  }
+
+  // Check if the message belongs to a one-to-one chat or a group chat
+  if (message.chatId) {
+    // One-to-one chat
+    if (String(message.senderId) === String(userId)) {
+      // Update isRead for the message sent by the logged-in user
+      message.isRead = true;
+      await message.save();
+    } else {
+      return res.status(403).json({ error: "Unauthorized access: You cannot mark this message as read" });
+    }
+  } else {
+    // Group chat
+    const chat = message.chatId;
+    const participants = chat.participants.map(participant => participant.userId);
+
+    if (!message.seenBy.includes(userId)) {
+      // If the user is not in seenBy array, add the user to seenBy array
+      message.seenBy.push(userId);
+      await message.save();
+
+      const seenParticipants = message.seenBy.map(seenId => String(seenId));
+
+      // Check if all participants have seen the message
+      const allParticipantsSeen = participants.every(participantId => seenParticipants.includes(String(participantId)));
+
+      if (allParticipantsSeen) {
+        // All participants have seen the message, mark the message as read
+        message.isRead = true;
+        await message.save();
+      }
+    }
+  }
+
+  res.status(200).json({ message: "Message marked as read" });
 });
