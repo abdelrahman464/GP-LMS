@@ -289,6 +289,13 @@ exports.getMyChats = asyncHandler(async (req, res) => {
             in: "$$userDetail.username",
           },
         },
+        "participants.profileImg": {
+          $map: {
+            input: "$participants.userDetails",
+            as: "userDetail",
+            in: "$$userDetail.profileImg",
+          },
+        },
       },
     },
     {
