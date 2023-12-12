@@ -52,7 +52,7 @@ MessageSchema.pre(/^find/, function (next) {
   this.populate({ path: "forwardedFrom", select: "username profileImg" })
     .populate({ path: "reactions", select: "username profileImg" })
     .populate({ path: "senderId", select: "username profileImg" })
-    .populate({ path: "repliedTo", select: "senderId text media" });
+    .populate({ path: "repliedTo", select: "username text media" });
   next();
 });
 const Message = mongoose.model("Message", MessageSchema);
