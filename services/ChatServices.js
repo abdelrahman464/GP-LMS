@@ -103,7 +103,7 @@ exports.addParticipantToChat = asyncHandler(async (req, res, next) => {
 
   // Find the logged-in user in the chat to verify admin privileges
   const loggedUser = chat.participants.find(
-    (participant_) => String(participant_.userId) === String(loggedUserId)
+    (participant_) => String(participant_.userId._id) === String(loggedUserId)
   );
 
   if (!loggedUser || !loggedUser.isAdmin) {
@@ -145,7 +145,7 @@ exports.removeParticipantFromChat = asyncHandler(async (req, res, next) => {
 
   // Find the index of the participant in the chat
   const participantIndex = chat.participants.findIndex(
-    (participant) => String(participant.userId) === userId
+    (participant) => String(participant.userId._id) === userId
   );
 
   if (participantIndex === -1) {
@@ -173,7 +173,7 @@ exports.updateParticipantRoleInChat = asyncHandler(async (req, res, next) => {
 
   // Find the logged-in user in the chat to verify admin privileges
   const loggedUser = chat.participants.find(
-    (participant_) => String(participant_.userId) === String(loggedUserId)
+    (participant_) => String(participant_.userId._id) === String(loggedUserId)
   );
 
   if (!loggedUser || !loggedUser.isAdmin) {
@@ -184,11 +184,18 @@ exports.updateParticipantRoleInChat = asyncHandler(async (req, res, next) => {
 
   // Find the participant to update their role
   const participantToUpdate = chat.participants.find(
-    (participant_) => String(participant_.userId) === userId
+    (participant_) => String(participant_.userId._id) === userId
   );
 
   if (!participantToUpdate) {
     return res.status(404).json({ error: "Participant not found in the chat" });
+  }
+
+  // Check if the userId from body matches the creator of the chat
+  const creatorOfChat = chat.creator._id; // Assuming the creator is the first participant
+
+  if (String(creatorOfChat) === userId) {
+    return res.status(403).json({ error: "Unauthorized: Cannot update the creator's role" });
   }
 
   // Update the participant's role
@@ -197,6 +204,7 @@ exports.updateParticipantRoleInChat = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({ data: chat });
 });
+
 
 //@desc Get details of a specific chat including participants' details
 //@route GET /api/v1/chat/:chatId/details
