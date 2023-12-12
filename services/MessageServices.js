@@ -1,23 +1,84 @@
 const asyncHandler = require("express-async-handler");
 const Message = require("../models/MessageModel");
+const Chat = require("../models/ChatModel");
 
 //@desc add a message to chat
-//@route POST /api/v1/message/:messageId
+//@route POST /api/v1/message/:chatId
 //@access protected
 exports.addMessage = asyncHandler(async (req, res) => {
   const { chatId } = req.params;
   const { text } = req.body;
   const senderId = req.user._id; // logged user id
 
+  // Create a new message
   const message = new Message({
     chatId,
     senderId,
     text,
   });
 
-  const result = await message.save();
-  res.status(200).json(result);
+  // Save the message
+  await message.save();
+
+  // Retrieve all chats of the user
+  const userChats = await Chat.find({ "participants.userId": senderId });
+
+  // Find the last chat that contains the latest message
+  let lastChatWithLatestMessage = null;
+  let latestMessageTimestamp = 0;
+
+  for (const chat of userChats) {
+    if (
+      chat.lastMessage &&
+      chat.lastMessage.createdAt > latestMessageTimestamp
+    ) {
+      latestMessageTimestamp = chat.lastMessage.createdAt;
+      lastChatWithLatestMessage = chat;
+    }
+  }
+
+  res.status(200).json({ userChats, lastChatWithLatestMessage });
 });
+// exports.addMessage = asyncHandler(async (req, res) => {
+//   const { chatId } = req.params;
+//   const { text } = req.body;
+//   const senderId = req.user._id; // logged user id
+
+//   // Create a new message
+//   const message = new Message({
+//     chatId,
+//     senderId,
+//     text,
+//   });
+
+//   // Save the message
+//   await message.save();
+
+//   // Retrieve all chats of the user and sort by the time of the last message
+//   const userChats = await Chat.aggregate([
+//     {
+//       $match: { "participants.userId": senderId }
+//     },
+//     {
+//       $lookup: {
+//         from: "messages",
+//         localField: "_id",
+//         foreignField: "chatId",
+//         as: "messages",
+//       },
+//     },
+//     {
+//       $addFields: {
+//         lastMessageTime: { $max: "$messages.createdAt" }
+//       }
+//     },
+//     {
+//       $sort: { lastMessageTime: -1 }
+//     }
+//   ]);
+
+//   res.status(200).json({ userChats });
+// });
 //@desc
 //@route GET /api/v1/message
 //@access protected

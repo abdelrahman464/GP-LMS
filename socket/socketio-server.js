@@ -1,10 +1,11 @@
+/* eslint-disable no-shadow */
 const { Server } = require("socket.io");
-
+const Chat = require("../models/ChatModel");
 const io = new Server();
 
 // Store active users and their sockets
 let activeUsers = [];
-
+let usersInChat = [];
 // Store active group chats
 // eslint-disable-next-line prefer-const
 let groupChats = [];
@@ -17,9 +18,16 @@ io.on("connection", (socket) => {
         socketId: socket.id,
       });
     }
-
-    // Send all active users to new user
     io.emit("get-users", activeUsers);
+  });
+  socket.on("new-user-in-chat", (data) => {
+    if (!usersInChat.some((user) => user.userId === data.user)) {
+      usersInChat.push({
+        userId: data.user,
+        chat: data.chat,
+        socketId: socket.id,
+      });
+    }
   });
 
   socket.on("disconnect", () => {
@@ -28,12 +36,15 @@ io.on("connection", (socket) => {
   });
 
   socket.on("send-message", (data) => {
-    const { receiverId, chatType, message, senderId } = data;
-
+    const { receiverId, chatType, message, senderId, chatId } = data;
     if (chatType === "user") {
-      const user = activeUsers.find((user) => user.userId === receiverId);
+      const user = usersInChat.find((user) => user.userId === receiverId);
       if (user) {
-        io.to(user.socketId).emit("receive-message", message);
+        if (user.chat === chatId) {
+          console.log("in user", user);
+          io.to(user.socketId).emit("receive-message", message);
+          
+        }
       }
     } else if (chatType === "group") {
       // Find the group chat by its ID
@@ -67,6 +78,7 @@ io.on("connection", (socket) => {
       groupChat.members.push({ userId });
     }
   });
+
 });
 
 module.exports = io;

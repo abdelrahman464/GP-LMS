@@ -39,5 +39,12 @@ const chatSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+chatSchema.pre(/^find/, function (next) {
+  this.populate({
+    path: "participants.userId",
+    select: "username profileImg",
+  }).populate({ path: "creator", select: "username profileImg" });
+  next();
+});
 const Chat = mongoose.model("Chat", chatSchema);
 module.exports = Chat;

@@ -349,3 +349,34 @@ exports.unarchiveChat = asyncHandler(async (req, res) => {
 
   res.status(200).json(chat);
 });
+
+// Find the latest message in each chat
+// Message.aggregate([
+//   {
+//     $group: {
+//       _id: '$chatId',
+//       latestMessage: { $max: '$createdAt' } // Get the maximum createdAt timestamp for each chatId
+//     }
+//   }
+// ]).exec((err, latestMessages) => {
+//   if (err) {
+//     console.error('Error retrieving latest messages:', err);
+//     return;
+//   }
+
+//   // Extract chatIds from the latestMessages result
+//   const chatIds = latestMessages.map(message => message._id);
+
+//   // Fetch chats based on the chatIds obtained
+//   Chat.find({ _id: { $in: chatIds } }).exec((chatErr, chats) => {
+//     if (chatErr) {
+//       console.error('Error retrieving chats:', chatErr);
+//       return;
+//     }
+
+//     // Here, 'chats' will contain the chat documents and 'latestMessages' will contain the latest message of each chat
+//     console.log('Chats:', chats);
+//     console.log('Latest Messages:', latestMessages);
+//     // Perform further operations with chats and messages as needed
+//   });
+// });
