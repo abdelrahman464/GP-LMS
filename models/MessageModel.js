@@ -71,31 +71,36 @@ MessageSchema.pre(/^find/, function (next) {
     });
   next();
 });
-MessageSchema.post(/^save/, async (doc, next) => {
+MessageSchema.post(/^save/, async function (doc, next) {
   try {
-    // Populate the required fields
-    await doc.populate({
-      path: 'reactions',
-      select: 'username profileImg',
-    })
-    .populate({
-      path: 'senderId',
-      select: 'username profileImg',
-    })
-    .populate({
-      path: 'repliedTo',
-      select: 'senderId text media',
-      populate: {
+    const populatedDoc = await this.constructor.findById(doc._id)
+      .populate({
+        path: 'reactions.userId',
+        select: 'username profileImg',
+      })
+      .populate({
         path: 'senderId',
         select: 'username profileImg',
-      },
-    })
-    .execPopulate();
+      })
+      .populate({
+        path: 'repliedTo',
+        select: 'senderId text media',
+        populate: {
+          path: 'senderId',
+          select: 'username profileImg',
+        },
+      });
 
-  next();;
+    // Replace the original document with the populated one
+    Object.assign(doc, populatedDoc._doc);
+
+    next();
   } catch (err) {
     next(err);
   }
 });
+
+
+
 const Message = mongoose.model("Message", MessageSchema);
 module.exports = Message;
