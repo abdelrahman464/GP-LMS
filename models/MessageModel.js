@@ -71,6 +71,16 @@ MessageSchema.pre(/^find/, function (next) {
     });
   next();
 });
-
+MessageSchema.post(/^save/, async (doc, next) => {
+  try {
+    // Populate the required fields
+    await doc.populate({
+      path: "senderId",
+      select: "username profileImg",
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 const Message = mongoose.model("Message", MessageSchema);
 module.exports = Message;
