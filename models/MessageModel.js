@@ -75,7 +75,7 @@ MessageSchema.post(/^save/, async function (doc, next) {
   try {
     const populatedDoc = await this.constructor.findById(doc._id)
       .populate({
-        path: 'reactions.userId',
+        path: 'reactions',
         select: 'username profileImg',
       })
       .populate({
