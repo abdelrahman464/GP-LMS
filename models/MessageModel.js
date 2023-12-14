@@ -75,9 +75,24 @@ MessageSchema.post(/^save/, async (doc, next) => {
   try {
     // Populate the required fields
     await doc.populate({
-      path: "senderId",
-      select: "username profileImg",
-    });
+      path: 'reactions',
+      select: 'username profileImg',
+    })
+    .populate({
+      path: 'senderId',
+      select: 'username profileImg',
+    })
+    .populate({
+      path: 'repliedTo',
+      select: 'senderId text media',
+      populate: {
+        path: 'senderId',
+        select: 'username profileImg',
+      },
+    })
+    .execPopulate();
+
+  next();;
   } catch (err) {
     next(err);
   }
