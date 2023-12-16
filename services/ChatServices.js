@@ -213,11 +213,11 @@ exports.getChatDetails = asyncHandler(async (req, res, next) => {
   const { chatId } = req.params;
 
   const chat = await Chat.findById(chatId)
-    .populate({
-      path: "participants.userId",
-      select: "username email profileImg",
-    })
-    .populate("pinnedMessages.messageId", "text senderId"); // Populate pinned message details
+    // .populate({
+    //   path: "participants.userId",
+    //   select: "username email profileImg",
+    // })
+    // .populate("pinnedMessages.messageId", "text senderId"); // Populate pinned message details
 
   if (!chat) {
     return res.status(404).json({ error: "Chat not found" });
