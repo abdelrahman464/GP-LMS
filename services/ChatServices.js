@@ -195,7 +195,9 @@ exports.updateParticipantRoleInChat = asyncHandler(async (req, res, next) => {
   const creatorOfChat = chat.creator._id; // Assuming the creator is the first participant
 
   if (String(creatorOfChat) === userId) {
-    return res.status(403).json({ error: "Unauthorized: Cannot update the creator's role" });
+    return res
+      .status(403)
+      .json({ error: "Unauthorized: Cannot update the creator's role" });
   }
 
   // Update the participant's role
@@ -205,19 +207,18 @@ exports.updateParticipantRoleInChat = asyncHandler(async (req, res, next) => {
   res.status(200).json({ data: chat });
 });
 
-
 //@desc Get details of a specific chat including participants' details
 //@route GET /api/v1/chat/:chatId/details
 //@access protected
 exports.getChatDetails = asyncHandler(async (req, res, next) => {
   const { chatId } = req.params;
 
-  const chat = await Chat.findById(chatId)
-    // .populate({
-    //   path: "participants.userId",
-    //   select: "username email profileImg",
-    // })
-    // .populate("pinnedMessages.messageId", "text senderId"); // Populate pinned message details
+  const chat = await Chat.findById(chatId);
+  // .populate({
+  //   path: "participants.userId",
+  //   select: "username email profileImg",
+  // })
+  // .populate("pinnedMessages.messageId", "text senderId"); // Populate pinned message details
 
   if (!chat) {
     return res.status(404).json({ error: "Chat not found" });
@@ -485,33 +486,32 @@ exports.unarchiveChat = asyncHandler(async (req, res) => {
   res.status(200).json(chat);
 });
 
-// Find the latest message in each chat
-// Message.aggregate([
-//   {
-//     $group: {
-//       _id: '$chatId',
-//       latestMessage: { $max: '$createdAt' } // Get the maximum createdAt timestamp for each chatId
-//     }
-//   }
-// ]).exec((err, latestMessages) => {
-//   if (err) {
-//     console.error('Error retrieving latest messages:', err);
-//     return;
-//   }
+//@desc Mark all messages in a chat as read
+//@route PUT /api/v1/chat/:chatId/markasread
+//@access protected
+exports.markUserMessagesAsRead = asyncHandler(async (req, res) => {
+  const { chatId } = req.params;
+  const userId = req.user._id; // logged user id
 
-//   // Extract chatIds from the latestMessages result
-//   const chatIds = latestMessages.map(message => message._id);
+  try {
+    const unreadMessages = await Message.find({ chatId, isRead: false });
 
-//   // Fetch chats based on the chatIds obtained
-//   Chat.find({ _id: { $in: chatIds } }).exec((chatErr, chats) => {
-//     if (chatErr) {
-//       console.error('Error retrieving chats:', chatErr);
-//       return;
-//     }
+    if (!unreadMessages || unreadMessages.length === 0) {
+      return res.status(404).json({ error: "No unread messages found in this chat" });
+    }
 
-//     // Here, 'chats' will contain the chat documents and 'latestMessages' will contain the latest message of each chat
-//     console.log('Chats:', chats);
-//     console.log('Latest Messages:', latestMessages);
-//     // Perform further operations with chats and messages as needed
-//   });
-// });
+    const userInSeenBy = unreadMessages.filter(
+      (message) => message.chatId && !message.seendBy.includes(userId)
+    );
+
+    await Promise.all(userInSeenBy.map(async (message) => {
+      message.isRead = true;
+      message.seendBy.push(userId); // Add the user to seenBy array
+      await message.save();
+    }));
+
+    res.status(200).json({ message: "Unread messages in the chat marked as read" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});

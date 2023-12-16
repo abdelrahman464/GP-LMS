@@ -254,66 +254,7 @@ exports.getForwardedMessages = asyncHandler(async (req, res) => {
 
   res.status(200).json(forwardedMessages);
 });
-//@desc Mark a message as read in a one-to-one chat or update seenBy in a group chat
-//@route PUT /api/v1/message/:messageId/markasread
-//@access protected
-exports.markMessageAsRead = asyncHandler(async (req, res) => {
-  const { messageId } = req.params;
-  const userId = req.user._id; // logged user id
 
-  try {
-    const message = await Message.findById(messageId).populate("chatId");
-
-    if (!message) {
-      return res.status(404).json({ error: "Message not found" });
-    }
-
-    // Check if the message belongs to a one-to-one chat or a group chat
-    if (message.chatId) {
-      // One-to-one chat
-      if (String(message.senderId._id) === String(userId)) {
-        // Update isRead for the message sent by the logged-in user
-        message.isRead = true;
-        await message.save();
-      } else {
-        return res.status(403).json({
-          error: "Unauthorized access: You cannot mark this message as read",
-        });
-      }
-    } else {
-      // Group chat
-      const chat = message.chatId;
-      const participants = chat.participants.map((participant) =>
-        String(participant.userId)
-      );
-
-      if (!message.seendBy.includes(userId)) {
-        // If the user is not in seenBy array, add the user to seenBy array
-        message.seendBy.push(userId);
-        await message.save();
-
-        const seenParticipants = message.seendBy.map((seenId) =>
-          String(seenId)
-        );
-
-        // Check if all participants have seen the message
-        const allParticipantsSeen = participants.every((participantId) =>
-          seenParticipants.includes(participantId)
-        );
-
-        if (allParticipantsSeen) {
-          // All participants have seen the message, mark the message as read
-          message.isRead = true;
-          await message.save();
-        }
-      }
-    }
-
-    res.status(200).json({ message: "Message marked as read" });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
 //@desc  get count of unread messages for a chat ID
 //@route GET /api/v1/unread/:chatId
 //@access protected private

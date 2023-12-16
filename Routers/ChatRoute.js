@@ -16,6 +16,7 @@ const {
   unpinMessageInChat,
   archiveChat,
   unarchiveChat,
+  markUserMessagesAsRead
 } = require("../services/ChatServices");
 const authServices = require("../services/authServices");
 
@@ -59,5 +60,6 @@ router.delete(
 );
 router.put("/:chatId/archive", authServices.protect, archiveChat);
 router.put("/:chatId/unarchive", authServices.protect, unarchiveChat);
+router.put("/:chatId/markasread", authServices.protect, markUserMessagesAsRead);
 
 module.exports = router;
