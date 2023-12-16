@@ -11,6 +11,8 @@ const {
   forwardMessage,
   getForwardedMessages,
   markMessageAsRead,
+  countUnreadMessages,
+  countUnreadMessagesForUser,
 } = require("../services/MessageServices");
 const authServices = require("../services/authServices");
 
@@ -31,5 +33,7 @@ router.get("/:messageId/replies", authServices.protect, getRepliesToMessage);
 router.post("/:messageId/forward", authServices.protect, forwardMessage);
 router.get("/:messageId/forwarded", authServices.protect, getForwardedMessages);
 router.put("/:messageId/markasread", authServices.protect, markMessageAsRead);
+router.get("/unread/user", authServices.protect, countUnreadMessagesForUser);
+router.get("/unread/:chatId", authServices.protect, countUnreadMessages);
 
 module.exports = router;
