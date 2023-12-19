@@ -501,13 +501,17 @@ exports.markUserMessagesAsRead = asyncHandler(async (req, res) => {
     }
 
     const userInSeenBy = unreadMessages.filter(
-      (message) => message.chatId && !message.seendBy.includes(userId)
+      (message) => message.chatId && !message.seenBy.includes(userId)
     );
 
     await Promise.all(userInSeenBy.map(async (message) => {
-      message.isRead = true;
-      message.seendBy.push(userId); // Add the user to seenBy array
-      await message.save();
+      await Message.updateOne(
+        { _id: message._id },
+        {
+          $set: { isRead: true },
+          $addToSet: { seenBy: userId } // Use $addToSet to add userId to seenBy array
+        }
+      );
     }));
 
     res.status(200).json({ message: "Unread messages in the chat marked as read" });
@@ -515,3 +519,4 @@ exports.markUserMessagesAsRead = asyncHandler(async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
