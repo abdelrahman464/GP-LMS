@@ -501,7 +501,7 @@ exports.markUserMessagesAsRead = asyncHandler(async (req, res) => {
     }
 
     const userInSeenBy = unreadMessages.filter(
-      (message) => message.chatId && !message.seenBy.includes(userId)
+      (message) => message.chatId && !message.seendBy.includes(userId)
     );
 
     await Promise.all(userInSeenBy.map(async (message) => {
@@ -509,7 +509,7 @@ exports.markUserMessagesAsRead = asyncHandler(async (req, res) => {
         { _id: message._id },
         {
           $set: { isRead: true },
-          $addToSet: { seenBy: userId } // Use $addToSet to add userId to seenBy array
+          $addToSet: { seendBy: userId } // Use $addToSet to add userId to seenBy array
         }
       );
     }));
