@@ -489,7 +489,7 @@ exports.unarchiveChat = asyncHandler(async (req, res) => {
 //@desc Mark all messages in a chat as read
 //@route PUT /api/v1/chat/:chatId/markasread
 //@access protected
-exports.markUserMessagesAsRead = asyncHandler(async (req, res) => {
+exports.markUserMessagesAsRead = async (req, res) => {
   const { chatId } = req.params;
   const userId = req.user._id; // logged user id
 
@@ -497,26 +497,116 @@ exports.markUserMessagesAsRead = asyncHandler(async (req, res) => {
     const unreadMessages = await Message.find({ chatId, isRead: false });
 
     if (!unreadMessages || unreadMessages.length === 0) {
-      return res.status(404).json({ error: "No unread messages found in this chat" });
+      return res
+        .status(404)
+        .json({ error: "No unread messages found in this chat" });
     }
 
-    const userInSeenBy = unreadMessages.filter(
-      (message) => message.chatId && !message.seendBy.includes(userId)
+    const chat = await Chat.findById(chatId); // Fetch the chat details
+
+    if (!chat) {
+      return res.status(404).json({ error: "Chat not found" });
+    }
+
+    const participantIds = chat.participants.map((participant) =>
+      participant.userId._id.toString()
+    );
+    console.log("participantIds", participantIds);
+    if (chat.isGroupChat) {
+      const isParticipant = participantIds.includes(userId.toString());
+
+      if (!isParticipant) {
+        return res
+          .status(403)
+          .json({ error: "User is not a participant of this group chat" });
+      }
+
+      const userInSeenBy = unreadMessages.filter(
+        (message) =>
+          message.chatId && !message.seendBy.includes(userId.toString())
+      );
+      console.log("userInSeenBy", userInSeenBy);
+      // Check if the user already marked the messages as read
+      const userMarkedRead = userInSeenBy.every((message) =>
+        message.seendBy.includes(userId)
+      );
+      console.log("userMarkedRead", userMarkedRead);
+
+      if (userMarkedRead) {
+        return res.status(200).json({
+          message: "Unread messages in the chat marked as read",
+        });
+      }
+
+      const allParticipantsSeen = userInSeenBy.every((message) => {
+        const unseenParticipants = participantIds
+          .filter(
+            (participantId) => participantId !== message.senderId._id.toString()
+          )
+          .filter((participantId) => !message.seendBy.includes(participantId));
+        console.log("unseenParticipants", unseenParticipants);
+        return unseenParticipants.length === 0;
+      });
+
+      if (!allParticipantsSeen) {
+        await Promise.all(
+          userInSeenBy.map(async (message) => {
+            if (!message.seendBy.includes(userId)) {
+              await Message.updateOne(
+                { _id: message._id },
+                { $addToSet: { seendBy: userId } }
+              );
+
+              const unseenParticipants = participantIds
+                .filter(
+                  (participantId) =>
+                    participantId !== message.senderId._id.toString()
+                )
+                .filter(
+                  (participantId) => !message.seendBy.includes(participantId)
+                );
+
+              if (
+                unseenParticipants.length === 1 &&
+                unseenParticipants[0] === userId.toString()
+              ) {
+                // If the last unseen participant is the current user, mark the message as read
+                await Message.updateOne(
+                  { _id: message._id },
+                  { $set: { isRead: true } }
+                );
+              }
+            }
+          })
+        );
+
+        return res.status(200).json({
+          message: "Wait for all participants to read the message",
+        });
+      }
+    }
+
+    await Promise.all(
+      unreadMessages.map(async (message) => {
+        if (message.senderId._id.toString() === userId.toString()) {
+          // If sender, don't add to seendBy array or mark as read
+          return;
+        }
+
+        await Message.updateOne(
+          { _id: message._id },
+          {
+            $set: { isRead: true },
+            $addToSet: { seendBy: userId },
+          }
+        );
+      })
     );
 
-    await Promise.all(userInSeenBy.map(async (message) => {
-      await Message.updateOne(
-        { _id: message._id },
-        {
-          $set: { isRead: true },
-          $addToSet: { seendBy: userId } // Use $addToSet to add userId to seenBy array
-        }
-      );
-    }));
-
-    res.status(200).json({ message: "Unread messages in the chat marked as read" });
+    res
+      .status(200)
+      .json({ message: "Unread messages in the chat marked as read" });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
-});
-
+};
