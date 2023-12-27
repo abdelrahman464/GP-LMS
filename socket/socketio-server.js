@@ -1,4 +1,3 @@
-
 /* eslint-disable no-shadow */
 
 const { Server } = require("socket.io");
@@ -23,18 +22,23 @@ io.on("connection", (socket) => {
     io.emit("get-users", activeUsers);
   });
   socket.on("new-user-in-chat", (data) => {
-    if (!usersInChat.some((user) => user.userId === data.user)) {
-      usersInChat.push({
-        userId: data.user,
-        chat: data.chat,
-        socketId: socket.id,
-      });
-    }
+    usersInChat = usersInChat.filter((user) => user.userId !== data.user);
+    usersInChat.push({
+      userId: data.user,
+      chat: data.chat,
+      socketId: socket.id,
+    });
+    const usersInThisChat = usersInChat.filter(
+      (user) => user.chat === data.chat
+    );
+    usersInThisChat.forEach((user) => {
+      if (user.userId !== data.user)
+        io.to(user.socketId).emit("see-from", data.user);
+    });
   });
   socket.on("user-leave-chat", (data) => {
-    usersInChat = usersInChat.filter(
-      (user) => user.userId !== data.user && user.chat !== data.chat
-    );
+    usersInChat = usersInChat.filter((user) => user.userId !== data.user);
+    console.log(usersInChat);
   });
   socket.on("disconnect", () => {
     activeUsers = activeUsers.filter((user) => user.socketId !== socket.id);
@@ -54,6 +58,7 @@ io.on("connection", (socket) => {
       const userToUpdateChat = activeUsers.find(
         (user) => user.userId === receiverId
       );
+      console.log(userToUpdateChat);
       if (userToUpdateChat) {
         io.to(userToUpdateChat.socketId).emit("update-chat", { message, type });
       }
@@ -81,6 +86,15 @@ io.on("connection", (socket) => {
             });
           }
         });
+      }
+    }
+  });
+  socket.on("see-message", (data) => {
+    const { receiverId, senderId, chatId } = data;
+    const user = usersInChat.find((user) => user.userId === receiverId);
+    if (user) {
+      if (user.chat === chatId) {
+        io.to(user.socketId).emit("see-from", senderId);
       }
     }
   });
@@ -119,7 +133,7 @@ io.on("connection", (socket) => {
   // Add a user to an existing group chat
   socket.on("add-user-to-group-chat", (data) => {
     const { chatId, userId } = data;
-
+    console.log(data);
     const groupChat = groupChats.find((chat) => chat.id === chatId);
     if (groupChat) {
       groupChat.members.push({ userId });
@@ -128,5 +142,3 @@ io.on("connection", (socket) => {
 });
 
 module.exports = io;
-
-
