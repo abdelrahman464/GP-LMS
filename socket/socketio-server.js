@@ -58,7 +58,6 @@ io.on("connection", (socket) => {
       const userToUpdateChat = activeUsers.find(
         (user) => user.userId === receiverId
       );
-      console.log(userToUpdateChat);
       if (userToUpdateChat) {
         io.to(userToUpdateChat.socketId).emit("update-chat", { message, type });
       }
@@ -69,7 +68,7 @@ io.on("connection", (socket) => {
         groupChat.members.forEach((member) => {
           // send the message
           const user = usersInChat.find((user) => user.userId === member);
-          if (user?.userId !== senderId && user?.chat === chatId) {
+          if (user.userId !== senderId && user?.chat === chatId) {
             io.to(user.socketId).emit("receive-message", {
               message,
               type,
