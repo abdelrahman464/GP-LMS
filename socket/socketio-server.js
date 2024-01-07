@@ -68,7 +68,7 @@ io.on("connection", (socket) => {
         groupChat.members.forEach((member) => {
           // send the message
           const user = usersInChat.find((user) => user.userId === member);
-          if (user.userId !== senderId && user?.chat === chatId) {
+          if (user?.userId !== senderId && user?.chat === chatId) {
             io.to(user.socketId).emit("receive-message", {
               message,
               type,
