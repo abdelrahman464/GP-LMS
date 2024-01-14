@@ -1,12 +1,10 @@
 /* eslint-disable import/no-extraneous-dependencies */
 const stripe = require("stripe")(process.env.STRIPE_SECRET);
 const asyncHandler = require("express-async-handler");
-const coinbase = require("coinbase-commerce-node");
 const ApiError = require("../utils/apiError");
 const factory = require("./handllerFactory");
-
 const Order = require("../models/orderModel");
-const Package = require("../models/packageModel");
+const Course = require("../models/courseModel");
 const User = require("../models/userModel");
 const Coupon = require("../models/couponModel");
 
@@ -29,23 +27,21 @@ exports.findSpecificOrder = factory.getOne(Order);
 //@route GET /api/v1/orders/checkout-session/packageId
 //@access protected/user
 exports.checkoutSession = asyncHandler(async (req, res, next) => {
-  const { packageId } = req.params;
+  const { courseId } = req.params;
   const metadataObject = {};
-  metadataObject.type = "education";
   //app settings
   const taxPrice = 0;
 
   //1) get cart depend on catrId
-  const package = await Package.findById(packageId);
-  if (!package) {
-    return next(new ApiError("There's no package", 404));
+  const course = await Course.findById(courseId);
+  if (!course) {
+    return next(new ApiError("There's no course", 404));
   }
   //2) get order price cart price  "check if copoun applied"
-  let packagePrice = package.priceAfterDiscount
-    ? package.priceAfterDiscount
-    : package.price;
+  let coursePrice = course.priceAfterDiscount
+    ? course.priceAfterDiscount
+    : course.price;
 
-  //gomaa edit ' discount value' ----------------------------------------
   if (req.body.coupon) {
     const coupon = await Coupon.findOne({
       name: req.body.coupon,
@@ -56,13 +52,12 @@ exports.checkoutSession = asyncHandler(async (req, res, next) => {
     }
     metadataObject.coupon = req.body.coupon;
 
-    packagePrice = (
-      packagePrice -
-      (packagePrice * coupon.discount) / 100
-    ).toFixed(2);
+    coursePrice = (coursePrice - (coursePrice * coupon.discount) / 100).toFixed(
+      2
+    );
   }
   //------
-  const totalOrderPrice = Math.ceil(packagePrice + taxPrice);
+  const totalOrderPrice = Math.ceil(coursePrice + taxPrice);
 
   //3)create stripe checkout session
   const session = await stripe.checkout.sessions.create({
@@ -79,11 +74,11 @@ exports.checkoutSession = asyncHandler(async (req, res, next) => {
       },
     ],
     mode: "payment",
-    success_url: `https://www.wealthmakers-fx.com/profile`,
-    cancel_url: `https://www.wealthmakers-fx.com`,
+    success_url: `/profile`,
+    cancel_url: `/`,
     customer_email: req.user.email,
 
-    client_reference_id: req.params.packageId, // i will use to create order
+    client_reference_id: req.params.courseId, // i will use to create order
     metadata: metadataObject,
   });
 
@@ -92,19 +87,17 @@ exports.checkoutSession = asyncHandler(async (req, res, next) => {
 });
 //*-------------------------------------------------------------------------------------- */
 const createOrder = async (session) => {
-  const packageId = session.client_reference_id;
+  const courseId = session.client_reference_id;
   const orderPrice = session.amount_total / 100;
   //1)retrieve importsant objects
-  const package = await Package.findById(packageId);
+  const course = await Course.findById(courseId);
   const user = await User.findOne({ email: session.customer_email });
-  console.log(`start 1`);
-  if (!package) {
-    return new Error("Package Not Found");
+  if (!course) {
+    return new Error("course Not Found");
   }
   if (!user) {
     return new Error(" User Not Found");
   }
-  console.log(`create order`);
 
   const coupon = session.metadata.coupon || "no coupon used";
   //2)create order with default payment method cash
@@ -117,122 +110,42 @@ const createOrder = async (session) => {
     paidAt: Date.now(),
   });
 
-  console.log(`createdd order`);
-
   if (!order) {
     return new Error("Couldn't Create Order");
   }
 
-  const startDate = new Date();
-  const endDate = new Date(startDate);
-  endDate.setDate(endDate.getDate() + package.expirationTime);
-  // 2)Add the user object to the users array
-  const newUser = {
-    user: user._id,
-    start_date: startDate,
-    end_date: endDate,
-  };
-
-  package.users.addToSet(newUser);
-  console.log(`done`);
-  await package.save();
+  // 2)Add the user object to the users array in the course
+  course.users.addToSet(user._id);
+  await course.save();
 };
 //-----------------------------------------------------------------------
 
 //@desc this webhook will run when the stripe payment success paied
-//@route POST education/webhook-checkout
+//@route POST /webhook-checkout
 //@access protected/user
-exports.webhookCheckoutEducation = asyncHandler(async (req, res) => {
+exports.webhookCheckout = asyncHandler(async (req, res) => {
   const sig = req.headers["stripe-signature"];
 
   let event;
 
   try {
-    console.log(`start verify`);
     event = stripe.webhooks.constructEvent(
       req.rawBody,
       sig,
-      process.env.STRIPE_WEBHOOK_SECRET_EDUCATION
+      process.env.STRIPE_WEBHOOK_SECRET
     );
   } catch (err) {
-    console.log(err);
     res.status(400).send(`Webhook Error: ${err.message}`);
     return;
   }
-  console.log(`start to compare`);
-  if (event.data.object.metadata.type === "education") {
-    switch (event.type) {
-      case "checkout.session.completed":
-        console.log(`education :)`);
-        await createOrder(event.data.object);
-        break;
-      default:
-        console.log(`Unhandled event type ${event.type}`);
-    }
+
+  switch (event.type) {
+    case "checkout.session.completed":
+      await createOrder(event.data.object);
+      break;
+    default:
+      console.log(`Unhandled event type ${event.type}`);
   }
 
   res.status(200).json({ received: true });
-});
-//------------------------------------------------------------------------------
-exports.checkoutSessionCoinBase = asyncHandler(async (req, res, next) => {
-  const { packageId } = req.params;
-  //app settings
-  const taxPrice = 0;
-  //1) get cart depend on catrId
-  const package = await Package.findById(packageId);
-  if (!package) {
-    return next(new ApiError("There's no package", 404));
-  }
-  // eslint-disable-next-line prefer-const
-  let metadatainfo = {
-    type: "education",
-    user_id: req.user._id,
-    packageId: packageId,
-  };
-
-  //2) get order price cart price  "check if copoun applied"
-  let packagePrice = package.priceAfterDiscount
-    ? package.priceAfterDiscount
-    : package.price;
-
-  //applying discount
-  if (req.body.coupon) {
-    const coupon = await Coupon.findOne({
-      name: req.body.coupon,
-      expire: { $gt: Date.now() },
-    });
-    if (!coupon) {
-      return next(new ApiError("Coupon is Invalid or Expired "));
-    }
-    metadatainfo.coupon = req.body.coupon;
-    packagePrice = (
-      packagePrice -
-      (packagePrice * coupon.discount) / 100
-    ).toFixed(2);
-  }
-
-  const totalOrderPrice = Math.ceil(packagePrice + taxPrice);
-
-  //3)- create coin base session
-  const { Client } = coinbase;
-  const { resources } = coinbase;
-  try {
-    Client.init(process.env.COINBASE_API_KEY);
-
-    const session = await resources.Charge.create({
-      name: "purchaseing package",
-      description: "have a nice payment",
-      local_price: {
-        amount: totalOrderPrice,
-        currency: "USD",
-      },
-      pricing_type: "fixed_price",
-      metadata: metadatainfo,
-    });
-    //4) send session to response
-    console.log(metadatainfo);
-    res.status(200).json({ status: "success", session });
-  } catch (error) {
-    res.status(400).json({ error: error });
-  }
 });

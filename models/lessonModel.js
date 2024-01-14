@@ -12,7 +12,7 @@ const lessonSchema = new mongoose.Schema({
   type: {
     type: String,
     required: [true, "lesson's type is required"],
-    enum: ["recorded", "live"],
+    enum: ["file", "recorded"],
     default: "recorded",
   },
   image: {
@@ -23,6 +23,9 @@ const lessonSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  attachment: {
+    type: String,
+  },
 });
 
 const setImageURL = (doc) => {
@@ -30,6 +33,10 @@ const setImageURL = (doc) => {
   if (doc.image) {
     const imageUrl = `${process.env.BASE_URL}/lessons/${doc.image}`;
     doc.image = imageUrl;
+  }
+  if (doc.attachment) {
+    const attachmentUrl = `${process.env.BASE_URL}/lessons/${doc.attachment}`;
+    doc.attachment = attachmentUrl;
   }
 };
 //after initializ the doc in db

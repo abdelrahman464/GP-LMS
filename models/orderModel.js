@@ -15,10 +15,10 @@ const OrderSchema = new mongoose.Schema(
       type: Number,
     },
     paymentMethodType: {
-      type: String, 
+      type: String,
     },
     coupon: {
-      type: String, 
+      type: String,
     },
     isPaid: {
       type: Boolean,
@@ -29,7 +29,7 @@ const OrderSchema = new mongoose.Schema(
   { timestamp: true }
 );
 OrderSchema.pre(/^find/, function (next) {
-  this.populate({ path: "user", select: "username phone email " })
+  this.populate({ path: "user", select: "username phone email " });
   next();
 });
 module.exports = mongoose.model("Order", OrderSchema);

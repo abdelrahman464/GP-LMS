@@ -12,10 +12,10 @@ const courseSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    posts: [
+    users: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Post",
+        ref: "User",
       },
     ],
     instructor: {
@@ -71,7 +71,6 @@ courseSchema.pre(/^find/, function (next) {
 });
 
 courseSchema.pre("remove", async function (next) {
-  
   //delete lessons related to sections related to course
   await Lesson.deleteMany({ course: this._id });
 
