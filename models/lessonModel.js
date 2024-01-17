@@ -5,9 +5,9 @@ const lessonSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  course: {
+  section: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Course",
+    ref: "Section",
   },
   type: {
     type: String,

@@ -1,6 +1,5 @@
 const mongoose = require("mongoose");
 const Course = require("./courseModel");
-const Lesson = require("./lessonModel");
 //1- create schema
 const categorySchema = mongoose.Schema(
   {
@@ -37,17 +36,30 @@ categorySchema.post("init", (doc) => {
 categorySchema.post("save", (doc) => {
   setImageURL(doc);
 });
-categorySchema.pre("remove", async function (next) {
-  //course sections lesson
-  // Remove sections of courses relted to category
-  const courses = await Course.find({ category: this._id });
-  const courseIds = courses.map((course) => course._id); //[1.2.3]
-  await Lesson.deleteMany({ course: { $in: courseIds } });
+categorySchema.post("remove", async function (next) {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    // Find all courses in the category
+    const courses = await Course.find({ category: this._id }).session(session);
 
-  await Course.deleteMany({ category: this._id });
+    // Delete each course and cascade delete related entities
+    for (let course of courses) {
+      await course.remove({ session });
+    }
 
+    await session.commitTransaction();
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
+  }
   next();
 });
+
+
+
 //2- create model
 const CategoryModel = mongoose.model("Category", categorySchema);
 

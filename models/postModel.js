@@ -39,13 +39,23 @@ postSchema.pre(/^find/, function (next) {
   next();
 });
 
-postSchema.pre("remove", async function (next) {
-  //delete comments reated with post
-  await Comment.deleteMany({ post: this._id }); // worked
-  //delete reacts reated with post
-  await Reaction.deleteMany({ postId: this._id });
+postSchema.post("remove", async function (next) {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    await Comment.deleteMany({ post: this._id }).session(session);
+    await Reaction.deleteMany({ postId: this._id }).session(session);
+    await session.commitTransaction();
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
+  }
   next();
 });
+
+
 
 const setImageURL = (doc) => {
   //return image base url + iamge name

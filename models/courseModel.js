@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const Lesson = require("./lessonModel");
+const Section = require("./sectionModel");
 const Post = require("./postModel");
 
 const courseSchema = new mongoose.Schema(
@@ -16,6 +16,12 @@ const courseSchema = new mongoose.Schema(
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
+      },
+    ],
+    posts: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Post",
       },
     ],
     instructor: {
@@ -69,15 +75,48 @@ courseSchema.pre(/^find/, function (next) {
   this.populate({ path: "category", select: "title" });
   next();
 });
+// courseSchema.pre("remove", async function (next) {
+//   // Delete sections related to the course
+//   await Section.deleteMany({ course: this._id });
 
-courseSchema.pre("remove", async function (next) {
-  //delete lessons related to sections related to course
-  await Lesson.deleteMany({ course: this._id });
+//   // Delete lessons related to the sections of the course
+//   await Lesson.deleteMany({ section: { $in: this.sections } });
 
-  //delete current course's posts
-  await Post.deleteMany({ course: this._id });
+//   // Delete current course's posts
+//   await Post.deleteMany({ course: this._id });
+
+//   next();
+// });
+
+courseSchema.post("remove", async function (next) {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    // Find and delete related sections
+    const sections = await Section.find({ course: this._id }).session(session);
+    for (let section of sections) {
+      await section.remove({ session });
+    }
+
+    // Find and delete related posts (cascade to comments and reactions)
+    const posts = await Post.find({ course: this._id }).session(session);
+    for (let post of posts) {
+      await post.remove({ session });
+    }
+
+    await session.commitTransaction();
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
+  }
+
   next();
 });
+
+
 const Course = mongoose.model("Course", courseSchema);
 
 module.exports = Course;
