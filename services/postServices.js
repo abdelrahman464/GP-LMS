@@ -5,7 +5,7 @@ const ApiError = require("../utils/apiError");
 const factory = require("./handllerFactory");
 const Post = require("../models/postModel");
 const Course = require("../models/courseModel");
-const Package = require("../models/packageModel");
+
 const {
   uploadSingleImage,
 } = require("../middlewares/uploadImageMiddleware");
@@ -31,60 +31,60 @@ exports.resizeImage = asyncHandler(async (req, res, next) => {
 });
 //filter to get allowed posts for each user
 exports.createFilterObjAllowedPosts = async (req, res, next) => {
-  let filterObject = {};
+  // let filterObject = {};
 
-  if (req.user.role === "user") {
-    // all courses that the logged user is subscripe in
+  // if (req.user.role === "user") {
+  //   // all courses that the logged user is subscripe in
 
-    const userPackages = await Package.find({
-      "users.user": req.user._id,
-      "users.end_date": { $gt: new Date() },
-    });
+  //   const userPackages = await Package.find({
+  //     "users.user": req.user._id,
+  //     "users.end_date": { $gt: new Date() },
+  //   });
 
 
-    const coursePackageIds = userPackages.map((package) => package.courses);
+  //   const coursePackageIds = userPackages.map((package) => package.courses);
 
-    const coursesFromPackages = [];
+  //   const coursesFromPackages = [];
 
-    // eslint-disable-next-line no-restricted-syntax
-    for (const nestedArray of coursePackageIds) {
-      const flattenedArray = nestedArray.flat();
-      const uniqueElements = new Set(
-        flattenedArray.map((element) => element.toString())
-      );
-      coursesFromPackages.push(...uniqueElements);
-    }
+  //   // eslint-disable-next-line no-restricted-syntax
+  //   for (const nestedArray of coursePackageIds) {
+  //     const flattenedArray = nestedArray.flat();
+  //     const uniqueElements = new Set(
+  //       flattenedArray.map((element) => element.toString())
+  //     );
+  //     coursesFromPackages.push(...uniqueElements);
+  //   }
 
-    filterObject = {
-      $or: [
-        {
-          sharedTo: "course",
-          course: { $in: coursesFromPackages },
-        },
-        {
-          sharedTo: "public",
-        },
-      ],
-    };
-  }
-  if (req.user.role === "instructor") {
-    // all courses that the logged user is instructor in
-    const courses = await Course.find({ instructor: req.user._id });
-    const courseIds = courses.map((course) => course._id);
+  //   filterObject = {
+  //     $or: [
+  //       {
+  //         sharedTo: "course",
+  //         course: { $in: coursesFromPackages },
+  //       },
+  //       {
+  //         sharedTo: "public",
+  //       },
+  //     ],
+  //   };
+  // }
+  // if (req.user.role === "instructor") {
+  //   // all courses that the logged user is instructor in
+  //   const courses = await Course.find({ instructor: req.user._id });
+  //   const courseIds = courses.map((course) => course._id);
 
-    filterObject = {
-      $or: [
-        {
-          sharedTo: "course",
-          course: { $in: courseIds },
-        },
-        {
-          sharedTo: "public",
-        },
-      ],
-    };
-  }
-  req.filterObj = filterObject;
+  //   filterObject = {
+  //     $or: [
+  //       {
+  //         sharedTo: "course",
+  //         course: { $in: courseIds },
+  //       },
+  //       {
+  //         sharedTo: "public",
+  //       },
+  //     ],
+  //   };
+  // }
+  // req.filterObj = filterObject;
   next();
 };
 //filter to get public posts only
