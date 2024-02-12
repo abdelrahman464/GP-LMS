@@ -43,7 +43,6 @@ exports.createCourseValidator = [
       }
       return true;
     }),
-  
 
   check("category")
     .notEmpty()
@@ -169,16 +168,40 @@ exports.checkCourseIdParamValidator = [
   validatorMiddleware,
 ];
 
-exports.getRelatedCoursesValidator=[
+exports.getRelatedCoursesValidator = [
   check("catId")
-  .isMongoId().withMessage("invalid mongo id ")
-  
-  .custom((courseId) =>
+    .isMongoId()
+    .withMessage("invalid mongo id ")
+
+    .custom((courseId) =>
       Category.findById(courseId).then((category) => {
         if (!category) {
           return Promise.reject(new ApiError(`category Not Found`, 404));
         }
-      }))
-  ,
+      })
+    ),
+  validatorMiddleware,
+];
+
+exports.checkCourseOwnership = [
+  check("courseId")
+    .isMongoId()
+    .withMessage("Invalid ID format")
+    .custom((val, { req }) =>
+      Course.findById(val).then((course) => {
+        if (req.user.role === "admin") return true;
+        if (!course) {
+          return Promise.reject(new Error(`Course not found`));
+        }
+        if (
+          course.instructor._id.toString() !== req.user._id.toString() &&
+          req.user.role !== "admin"
+        ) {
+          return Promise.reject(
+            new Error(`Your are not allowed to perform this action`)
+          );
+        }
+      })
+    ),
   validatorMiddleware,
 ];
