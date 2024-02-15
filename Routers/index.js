@@ -15,7 +15,7 @@ const CategoryRoute = require("./categoryRoute");
 const CourseRoute = require("./courseRoute");
 const LessonRoute = require("./lessonRoute");
 const OrderRoute = require("./OrderRoute");
-const LiveRoute = require("./LiveRoute");
+
 
 const mountRoutes = (app) => {
   // Mount Routes
@@ -32,7 +32,7 @@ const mountRoutes = (app) => {
   app.use("/api/v1/courses", CourseRoute);
   app.use("/api/v1/lessons", LessonRoute);
   app.use("/api/v1/orders", OrderRoute);
-  app.use("/api/v1/lives", LiveRoute);
+
 
   app.use("/api/v1/posts", PostRoute);
   app.use("/api/v1/postComments", PostCommentRoute);
