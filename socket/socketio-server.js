@@ -3,6 +3,7 @@
 const { Server } = require("socket.io");
 const Chat = require("../models/ChatModel");
 const io = new Server();
+
 // Store active users and their sockets
 let activeUsers = [];
 let usersInChat = [];
