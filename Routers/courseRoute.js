@@ -4,7 +4,8 @@ const {
   checkCourseIdParamValidator,
   createCourseValidator,
   updateCourseValidator,
-  getRelatedCoursesValidator
+  getRelatedCoursesValidator,
+  checkCourseOwnership,
 } = require("../utils/validators/courseValidator");
 const {
   createCourse,
@@ -16,6 +17,8 @@ const {
   updateCourse,
   relatedCourses,
   addUserToCourse,
+  getCourseUsers,
+  createFilterObjToGetMyCourses,
 } = require("../services/courseService");
 const authServices = require("../services/authServices");
 // nested routes
@@ -30,7 +33,6 @@ router.post(
   "/",
   authServices.protect,
   authServices.allowedTo("instructor", "admin"),
-
   setinstructorIdToBody,
   createCourseValidator,
   createCourse
@@ -44,6 +46,13 @@ router.get(
   createFilterObj,
   getAllCourses
 );
+router.get(
+  "/MyCourses",
+  authServices.protect,
+  authServices.allowedTo("instructor", "admin", "user"),
+  createFilterObjToGetMyCourses,
+  getAllCourses
+);
 
 // Get a specific course by ID
 router.get(
@@ -54,16 +63,31 @@ router.get(
   getCourseById
 );
 //Get course with CategoryId  gomaa
-router.get("/relatedCourses/:catId", authServices.protect,getRelatedCoursesValidator,relatedCourses);
+router.get(
+  "/relatedCourses/:catId",
+  authServices.protect,
+  getRelatedCoursesValidator,
+  relatedCourses
+);
 // add user to course list   gomaa
 router.post("/addUserToCourse", authServices.protect, addUserToCourse);
+
+// get course users
+//make sure that the user is the instructor of the course
+router.get(
+  "/courseUsers",
+  authServices.protect,
+  authServices.allowedTo("instructor", "admin"),
+  checkCourseOwnership,
+  getCourseUsers
+);
 
 // Update a course by ID
 router.put(
   "/:id",
   authServices.protect,
   authServices.allowedTo("instructor", "admin"),
-  
+
   updateCourseValidator,
   updateCourse
 );
