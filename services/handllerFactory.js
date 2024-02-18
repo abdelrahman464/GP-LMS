@@ -40,7 +40,7 @@ exports.getOne = (Model, populationOt) =>
     res.status(200).json({ data: document });
   });
 
-  exports.getALl = (Model, modelName = "") =>
+exports.getALl = (Model, modelName = "") =>
   asyncHandler(async (req, res) => {
     let filter = {};
     if (req.filterObj) {
@@ -61,21 +61,21 @@ exports.getOne = (Model, populationOt) =>
       .status(200)
       .json({ results: documents.length, paginationResult, data: documents });
   });
-  //   const documentsCounts = await Model.countDocuments();
-  //   const apiFeatures = new ApiFeatures(Model.find(filter), req.query)
-  //     .paginate(documentsCounts)
-  //     .filter()
-  //     .search(modelName)
-  //     .limitFields()
-  //     .sort();
+//   const documentsCounts = await Model.countDocuments();
+//   const apiFeatures = new ApiFeatures(Model.find(filter), req.query)
+//     .paginate(documentsCounts)
+//     .filter()
+//     .search(modelName)
+//     .limitFields()
+//     .sort();
 
-  //   const { mongooseeQuery, paginationResult } = apiFeatures;
-  //   const documents = await mongooseeQuery;
+//   const { mongooseeQuery, paginationResult } = apiFeatures;
+//   const documents = await mongooseeQuery;
 
-  //   res
-  //     .status(200)
-  //     .json({ results: documents.length, paginationResult, data: documents });
-  // });
+//   res
+//     .status(200)
+//     .json({ results: documents.length, paginationResult, data: documents });
+// });
 
 exports.deleteOne = (Model) =>
   asyncHandler(async (req, res, next) => {
@@ -85,6 +85,6 @@ exports.deleteOne = (Model) =>
       return next(new ApiError(`No document for this id ${id}`, 404));
     }
     // Trigger "remove" event when delete document
-    document.remove();
+    await document.remove();
     res.status(204).send();
   });

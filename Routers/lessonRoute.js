@@ -11,8 +11,8 @@ const {
   updateLesson,
   deleteLesson,
   getLessonById,
-  getLessonsBySectionId,
-  relatedLessons,
+  createFilterObj,
+  getLessons,
 } = require("../services/lessonServices");
 
 const router = express.Router();
@@ -27,17 +27,10 @@ router.post(
   createLesson
 );
 // Get all lessons of a section
-router.get("/", authServices.protect, getLessonsBySectionId);
+router.get("/:sectionId", authServices.protect, createFilterObj, getLessons);
 
 // Get a specific lesson by ID
 router.get("/:id", authServices.protect, getLessonById);
-//Get course with CategoryId
-router.get(
-  "/relatedLessons/:courseId",
-  authServices.protect,
-  // checkAuthority2,
-  relatedLessons
-);
 
 // Update a lesson by ID
 router.put(

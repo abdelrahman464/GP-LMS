@@ -39,7 +39,7 @@ postSchema.pre(/^find/, function (next) {
   next();
 });
 
-postSchema.post("remove", async function (next) {
+postSchema.pre("remove", async function () {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
@@ -52,10 +52,7 @@ postSchema.post("remove", async function (next) {
   } finally {
     session.endSession();
   }
-  next();
 });
-
-
 
 const setImageURL = (doc) => {
   //return image base url + iamge name

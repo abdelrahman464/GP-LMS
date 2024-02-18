@@ -12,7 +12,7 @@ const lessonSchema = new mongoose.Schema({
   type: {
     type: String,
     required: [true, "lesson's type is required"],
-    enum: ["file", "recorded"],
+    enum: ["recorded", "file"],
     default: "recorded",
   },
   image: {
@@ -31,11 +31,11 @@ const lessonSchema = new mongoose.Schema({
 const setImageURL = (doc) => {
   //return image base url + iamge name
   if (doc.image) {
-    const imageUrl = `${process.env.BASE_URL}/lessons/${doc.image}`;
+    const imageUrl = `${process.env.BASE_URL}/lessons/images/${doc.image}`;
     doc.image = imageUrl;
   }
   if (doc.attachment) {
-    const attachmentUrl = `${process.env.BASE_URL}/lessons/${doc.attachment}`;
+    const attachmentUrl = `${process.env.BASE_URL}/lessons/files/${doc.attachment}`;
     doc.attachment = attachmentUrl;
   }
 };

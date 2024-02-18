@@ -8,14 +8,13 @@ const PostRoute = require("./postRoute");
 const PostCommentRoute = require("./postCommentRoute");
 const PostReactRoute = require("./postReactRoute");
 
-
 const CouponRoute = require("./couponRoute");
 const ReviewRoute = require("./reviewRoute");
 const CategoryRoute = require("./categoryRoute");
 const CourseRoute = require("./courseRoute");
 const LessonRoute = require("./lessonRoute");
+const sectionRoute = require("./sectionRoute");
 const OrderRoute = require("./OrderRoute");
-
 
 const mountRoutes = (app) => {
   // Mount Routes
@@ -25,14 +24,13 @@ const mountRoutes = (app) => {
   app.use("/api/v1/message", MessageRoute);
   app.use("/api/v1/notification", NotificationRoute);
 
-  
   app.use("/api/v1/coupons", CouponRoute);
   app.use("/api/v1/reviews", ReviewRoute);
   app.use("/api/v1/categories", CategoryRoute);
   app.use("/api/v1/courses", CourseRoute);
   app.use("/api/v1/lessons", LessonRoute);
+  app.use("/api/v1/sections", sectionRoute);
   app.use("/api/v1/orders", OrderRoute);
-
 
   app.use("/api/v1/posts", PostRoute);
   app.use("/api/v1/postComments", PostCommentRoute);

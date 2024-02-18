@@ -3,6 +3,7 @@ const validatorMiddleware = require("../../middlewares/validatorMiddleware");
 const Category = require("../../models/categoryModel");
 const ApiError = require("../apiError");
 const Course = require("../../models/courseModel");
+const User = require("../../models/userModel");
 
 exports.createCourseValidator = [
   check("title")
@@ -57,7 +58,27 @@ exports.createCourseValidator = [
         }
       })
     ),
-
+  check("instructor")
+    .notEmpty()
+    .withMessage("Course must belong to an instructor")
+    .isMongoId()
+    .withMessage("Invalid ID format")
+    // before i add product to category i must check if category is in database
+    .custom((instructorId) =>
+      User.find({ _id: instructorId, role: "instructor" }).then(
+        (instructor) => {
+          console.log(instructor);
+          if (instructor.length === 0) {
+            return Promise.reject(
+              new ApiError(
+                `the instructor you have entered must have role instructor`,
+                403
+              )
+            );
+          }
+        }
+      )
+    ),
   check("ratingsAverage")
     .optional()
     .isNumeric()

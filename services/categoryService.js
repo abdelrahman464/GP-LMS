@@ -3,9 +3,7 @@ const { v4: uuidv4 } = require("uuid");
 const asyncHandler = require("express-async-handler");
 const Category = require("../models/categoryModel");
 const factory = require("./handllerFactory");
-const {
-  uploadSingleImage,
-} = require("../middlewares/uploadImageMiddleware");
+const { uploadSingleImage } = require("../middlewares/uploadImageMiddleware");
 
 //upload Singel image
 exports.uploadCategoryImage = uploadSingleImage("image");
@@ -15,10 +13,9 @@ exports.resizeImage = asyncHandler(async (req, res, next) => {
 
   if (req.file) {
     await sharp(req.file.buffer)
-      .resize(600, 600)
       .toFormat("jpeg")
       .jpeg({ quality: 95 })
-      .toFile(`uploads/education/categories/${filename}`);
+      .toFile(`uploads/categories/${filename}`);
 
     //save image into our db
     req.body.image = filename;

@@ -10,10 +10,6 @@ const categorySchema = mongoose.Schema(
       minlength: [3, "too short category name"],
       maxlength: [32, "too long category name"],
     },
-    slug: {
-      type: String,
-      lowercase: true,
-    },
     image: String,
   },
   { timestamps: true }
@@ -36,7 +32,7 @@ categorySchema.post("init", (doc) => {
 categorySchema.post("save", (doc) => {
   setImageURL(doc);
 });
-categorySchema.post("remove", async function (next) {
+categorySchema.pre('remove', async function () {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
@@ -55,7 +51,7 @@ categorySchema.post("remove", async function (next) {
   } finally {
     session.endSession();
   }
-  next();
+  
 });
 
 

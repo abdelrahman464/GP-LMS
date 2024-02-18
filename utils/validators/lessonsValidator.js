@@ -1,8 +1,7 @@
 const { check } = require("express-validator");
 const validatorMiddleware = require("../../middlewares/validatorMiddleware");
 const ApiError = require("../apiError");
-const Course = require("../../models/courseModel");
-
+const Section = require("../../models/sectionModel");
 
 exports.createLessonValidator = [
   check("title")
@@ -11,18 +10,17 @@ exports.createLessonValidator = [
     .notEmpty()
     .withMessage("Course required"),
 
-  check("image").notEmpty().withMessage("Course Image Required"),
+  check("image").notEmpty().withMessage("lesson Image Required"),
 
-  check("course")
+  check("section")
     .notEmpty()
     .withMessage("Lesson must be belong to a Course")
     .isMongoId()
     .withMessage("Invalid ID format")
-    // before i add product to category i must check if category is in database
-    .custom((courseId) =>
-      Course.findById(courseId).then((course) => {
-        if (!course) {
-          return Promise.reject(new ApiError(`Course Not Found`, 404));
+    .custom((sectionId) =>
+      Section.findById(sectionId).then((section) => {
+        if (!section) {
+          return Promise.reject(new ApiError(`section Not Found`, 404));
         }
       })
     ),
@@ -30,29 +28,31 @@ exports.createLessonValidator = [
   //catch error and return it as a response
   validatorMiddleware,
 ];
-exports.updateLessonValidator=[
+exports.updateLessonValidator = [
   check("id").isMongoId().withMessage("invalid mongo Id "),
 
-  check("title").optional()
-  .isString().withMessage("string only allowed")
-  .trim()
-  .escape() 
-  .isLength({min:3}).withMessage("too short title ")
-  .isLength({max:125}).withMessage("too long title for course") ,
+  check("title")
+    .optional()
+    .isString()
+    .withMessage("string only allowed")
+    .trim()
+    .escape()
+    .isLength({ min: 3 })
+    .withMessage("too short title ")
+    .isLength({ max: 125 })
+    .withMessage("too long title for lesson"),
 
-   check("course")
+  check("section")
     .optional()
     .isMongoId()
     .withMessage("Invalid ID format")
     // before i add product to category i must check if category is in database
-    .custom((courseId) =>
-      Course.findById(courseId).then((course) => {
-        if (!course) {
-          return Promise.reject(new ApiError(`Course Not Found`, 404));
+    .custom((sectionId) =>
+      Section.findById(sectionId).then((section) => {
+        if (!section) {
+          return Promise.reject(new ApiError(`section Not Found`, 404));
         }
       })
-    )
-    ,
-    validatorMiddleware,
-]
-
+    ),
+  validatorMiddleware,
+];

@@ -46,6 +46,7 @@ const courseSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Category",
     },
+    image: String,
     ratingsAverage: {
       type: Number,
       min: [1, "rating must be between 1.0 and 5.0"],
@@ -75,6 +76,23 @@ courseSchema.pre(/^find/, function (next) {
   this.populate({ path: "category", select: "title" });
   next();
 });
+const setImageURL = (doc) => {
+  //return image base url + iamge name
+  if (doc.image) {
+    const imageUrl = `${process.env.BASE_URL}/courses/${doc.image}`;
+    doc.image = imageUrl;
+  }
+};
+//after initializ the doc in db
+// check if the document contains image
+// it work with findOne,findAll,update
+courseSchema.post("init", (doc) => {
+  setImageURL(doc);
+});
+// it work with create
+courseSchema.post("save", (doc) => {
+  setImageURL(doc);
+});
 // courseSchema.pre("remove", async function (next) {
 //   // Delete sections related to the course
 //   await Section.deleteMany({ course: this._id });
@@ -88,7 +106,7 @@ courseSchema.pre(/^find/, function (next) {
 //   next();
 // });
 
-courseSchema.post("remove", async function (next) {
+courseSchema.pre("remove", async function () {
   const session = await mongoose.startSession();
   session.startTransaction();
 
@@ -113,9 +131,8 @@ courseSchema.post("remove", async function (next) {
     session.endSession();
   }
 
-  next();
+ 
 });
-
 
 const Course = mongoose.model("Course", courseSchema);
 

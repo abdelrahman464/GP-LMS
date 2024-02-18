@@ -15,7 +15,7 @@ const sectionSchema = new mongoose.Schema({
     ref: "Course",
   },
 });
-sectionSchema.post("remove", async function (next) {
+sectionSchema.pre("remove", async function () {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
@@ -27,8 +27,6 @@ sectionSchema.post("remove", async function (next) {
   } finally {
     session.endSession();
   }
-  next();
 });
-
 
 module.exports = mongoose.model("Section", sectionSchema);

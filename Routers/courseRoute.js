@@ -8,6 +8,8 @@ const {
   checkCourseOwnership,
 } = require("../utils/validators/courseValidator");
 const {
+  uploadCourseImage,
+  resizeImage,
   createCourse,
   setinstructorIdToBody,
   getAllCourses,
@@ -33,6 +35,8 @@ router.post(
   "/",
   authServices.protect,
   authServices.allowedTo("instructor", "admin"),
+  uploadCourseImage,
+  resizeImage,
   setinstructorIdToBody,
   createCourseValidator,
   createCourse
@@ -87,7 +91,8 @@ router.put(
   "/:id",
   authServices.protect,
   authServices.allowedTo("instructor", "admin"),
-
+  uploadCourseImage,
+  resizeImage,
   updateCourseValidator,
   updateCourse
 );
