@@ -1,4 +1,4 @@
-  const mongoose = require("mongoose");
+const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
 const userShcema = mongoose.Schema(
@@ -31,9 +31,25 @@ const userShcema = mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    bio: String,
+    interests: [
+      {
+        type: String,
+        enum: ["Math", "Science", "Literature", "Art", "History", "Technology"],
+        message: "{VALUE} is not a supported interest",
+      },
+    ],
     profileImg: String,
-    about: String,
     country: String,
+    contactInfo: {
+      contactEmail: String,
+      phoneNumber: String,
+      socialLinks: {
+        facebook: String,
+        twitter: String,
+        linkedIn: String,
+      },
+    },
   },
 
   { timestamps: true }
