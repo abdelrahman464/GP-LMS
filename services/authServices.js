@@ -15,7 +15,7 @@ passport.use(
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
       callbackURL: "https://gp-f2nx.onrender.com/api/v1/auth/google/callback",
-      // passReqToCallback: true,
+      passReqToCallback: true,
     },
     asyncHandler(async (accessToken, refreshToken, profile, done) => {
       // Find or create a user google.id or user email in database
