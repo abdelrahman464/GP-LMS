@@ -17,7 +17,7 @@ passport.use(
       callbackURL: "https://gp-f2nx.onrender.com/api/v1/auth/google/callback",
       passReqToCallback: true,
     },
-    asyncHandler(async (accessToken, refreshToken, profile, done) => {
+    asyncHandler(async (req, accessToken, refreshToken, profile, done) => {
       // Find or create a user google.id or user email in database
       const existingUser = await User.findOne({
         $or: [{ "google.id": profile.id }, { email: profile.emails[0].value }],
