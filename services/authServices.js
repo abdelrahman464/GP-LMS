@@ -14,7 +14,7 @@ passport.use(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: "http://localhost:8000/api/v1/auth/google/callback",
+      callbackURL: "https://gp-f2nx.onrender.com/api/v1/auth/google/callback",
       // passReqToCallback: true,
     },
     asyncHandler(async (accessToken, refreshToken, profile, done) => {
