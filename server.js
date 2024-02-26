@@ -1,6 +1,8 @@
 const path = require("path");
 const http = require("http");
 
+const passport = require('passport');
+
 const express = require("express");
 
 const mongoose = require("mongoose");
@@ -16,7 +18,7 @@ const dotenv = require("dotenv");
 
 dotenv.config({ path: "config.env" });
 
-//database
+//database2
 const dbConnection = require("./config/database");
 const socketIOServer = require("./socket/socketio-server");
 //route
@@ -51,6 +53,12 @@ app.options("*", cors());
 
 // compress all responses
 app.use(compression());
+
+
+
+// Initialize Passport 
+app.use(passport.initialize());
+
 
 //checkout webhook
 // we will use to buy courses

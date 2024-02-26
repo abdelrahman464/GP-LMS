@@ -13,10 +13,24 @@ const userShcema = mongoose.Schema(
       unique: true,
       lowercase: true,
     },
+    google: {
+      id: String,
+      email: String,
+      // Any other Google profile information you want to store
+    },
     password: {
       type: String,
-      required: [true, "password required"],
+      required: [
+        function () {
+          return !this.isOAuthUser;
+        },
+        "password required",
+      ], // Add a custom validator or a condition
       minlength: [8, "too short Password"],
+    },
+    isOAuthUser: {
+      type: Boolean,
+      default: false,
     },
     passwordChangedAt: Date,
     passwordResetCode: String,

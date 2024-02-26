@@ -52,7 +52,6 @@ exports.updateUser = asyncHandler(async (req, res, next) => {
     req.params.id,
     {
       username: req.body.username,
-      email: req.body.email,
       phone: req.body.phone,
       profileImg: req.body.profileImg,
       role: req.body.role,
@@ -128,7 +127,6 @@ exports.updateLoggedUserData = asyncHandler(async (req, res, next) => {
     req.user._id,
     {
       username: req.body.username,
-      email: req.body.email,
       phone: req.body.phone,
       profileImg: req.body.profileImg,
     },

@@ -1,11 +1,51 @@
 const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const asyncHandler = require("express-async-handler");
+const passport = require("passport");
+const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const User = require("../models/userModel");
 const ApiError = require("../utils/apiError");
 const sendEmail = require("../utils/sendEmail");
 const generateToken = require("../utils/generateToken");
 const UserAuthorization = require("../middlewares/userAuthorizationMiddleware");
+
+passport.use(
+  new GoogleStrategy(
+    {
+      clientID: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      callbackURL: "http://localhost:8000/api/v1/auth/google/callback",
+      // passReqToCallback: true,
+    },
+    asyncHandler(async (accessToken, refreshToken, profile, done) => {
+      // Find or create a user google.id or user email in database
+      const existingUser = await User.findOne({
+        $or: [{ "google.id": profile.id }, { email: profile.emails[0].value }],
+      });
+      console.log("profile", profile);
+      if (existingUser) {
+        // User exists, generate a JWT
+        const token = generateToken(existingUser._id);
+        return done(null, { user: existingUser, token }); // Include token in the user object
+      }
+
+      const newUser = await User.create({
+        username: profile.displayName,
+        // Other user info mappings
+        email: profile.emails[0].value,
+        google: {
+          id: profile.id,
+          email: profile.emails[0].value,
+        },
+        isOAuthUser: true,
+      });
+      const token = generateToken(newUser._id);
+      done(null, { user: newUser, token }); // Include token in the user object
+
+      done(null, newUser);
+    })
+  )
+);
 
 //@desc signup
 //@route POST /api/v1/auth/signup
