@@ -51,8 +51,8 @@ exports.createUserValidator = [
 
   check("phone")
     .optional()
-    .isMobilePhone(['en-QA', 'en-AE'])
-    .withMessage("Invalid phone number I only accept Qatari and UAE phone numbers"),
+    .isMobilePhone()
+    .withMessage("Invalid phone number "),
 
   check("profileImg").optional(),
 
@@ -77,8 +77,8 @@ exports.updateUserValidator = [
     ),
   check("phone")
     .optional()
-    .isMobilePhone(['en-QA', 'en-AE'])
-    .withMessage("Invalid phone number I only accept Qatari and UAE phone numbers"),
+    .isMobilePhone()
+    .withMessage("Invalid phone number "),
 
 
   check("profileImg").optional(),
@@ -90,37 +90,7 @@ exports.deleteUserValidator = [
   check("id").isMongoId().withMessage("Invalid User id format"),
   validatorMiddleware,
 ];
-exports.changeUserPasswordValidator = [
-  body("currentPassword")
-    .notEmpty()
-    .withMessage("You must enter your current password"),
-  body("passwordConfirm")
-    .notEmpty()
-    .withMessage("Please enter your new password confirm"),
-  body("password")
-    .notEmpty()
-    .withMessage("Please enter your new password")
-    .custom(async (val, { req }) => {
-      // 1)verify current password
-      const user = await User.findById(req.params.id);
-      if (!user) {
-        throw new Error("User not found");
-      }
-      const isCorrectPassword = await bcrypt.compare(
-        req.body.currentPassword,
-        user.password
-      );
-      if (!isCorrectPassword) {
-        throw new Error("Current password is incorrect");
-      }
-      // 2)verify  password confrim
-      if (val !== req.body.passwordConfirm) {
-        throw new Error("password does not match");
-      }
-      return true;
-    }),
-  validatorMiddleware,
-];
+
 exports.updateLoggedUserValidator = [
   body("username")
     .optional()
@@ -138,7 +108,7 @@ exports.updateLoggedUserValidator = [
     ),
     check("phone")
     .optional()
-    .isMobilePhone(['en-QA', 'en-AE'])
+    .isMobilePhone()
     .withMessage("Invalid phone number I only accept Qatari and UAE phone numbers"),
 
   validatorMiddleware,

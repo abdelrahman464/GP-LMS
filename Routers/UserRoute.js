@@ -4,7 +4,7 @@ const {
   createUserValidator,
   updateUserValidator,
   deleteUserValidator,
-  changeUserPasswordValidator,
+ 
   updateLoggedUserValidator,
   changeLoggedUserPasswordValidator,
 } = require("../utils/validators/userValidator");
@@ -15,7 +15,6 @@ const {
   getUser,
   updateUser,
   deleteUser,
-  changeUserPassword,
   getLoggedUserData,
   updateLoggedUserPassword,
   updateLoggedUserData,
@@ -46,14 +45,6 @@ router.put(
 
 router.put("/deActiveMe", authServices.protect, deActiveLoggedUser);
 router.put("/activeMe", activeLoggedUser);
-
-router.put(
-  "/changePassword/:id",
-  authServices.protect,
-  authServices.allowedTo("admin"),
-  changeUserPasswordValidator,
-  changeUserPassword
-);
 
 router
   .route("/")

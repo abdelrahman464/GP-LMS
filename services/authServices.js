@@ -9,43 +9,64 @@ const sendEmail = require("../utils/sendEmail");
 const generateToken = require("../utils/generateToken");
 const UserAuthorization = require("../middlewares/userAuthorizationMiddleware");
 
+
+// @desc    User Register,login with Google
+// @route   POST /api/v1/auth/google
+// @access  Public
 passport.use(
   new GoogleStrategy(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: "https://gp-f2nx.onrender.com/api/v1/auth/google/callback",
+      callbackURL: process.env.GOOGLE_CALLBACK_URL,
       passReqToCallback: true,
     },
     asyncHandler(async (req, accessToken, refreshToken, profile, done) => {
-      // Find or create a user google.id or user email in database
-      const existingUser = await User.findOne({
+      // Find a user by google.id or email in the database
+      let existingUser = await User.findOne({
         $or: [{ "google.id": profile.id }, { email: profile.emails[0].value }],
       });
+
       console.log("profile", profile);
+
       if (existingUser) {
-        // User exists, generate a JWT
+        // Check if the user has logged in with Google before
+        if (!existingUser.google || !existingUser.google.id) {
+          // The user exists by email but hasn't logged in with Google before, so update the record
+          await User.updateOne(
+            { _id: existingUser._id }, // filter
+            { // update
+              $set: {
+                "google.id": profile.id,
+                "google.email": profile.emails[0].value,
+                isOAuthUser: true
+              }
+            }
+          );
+          // After update, it's a good idea to refresh the existingUser object if you plan to use it right after
+          existingUser = await User.findById(existingUser._id);
+        }
+        // Generate a JWT for the (possibly updated) existing user
         const token = generateToken(existingUser._id);
         return done(null, { user: existingUser, token }); // Include token in the user object
-      }
-
-      const newUser = await User.create({
-        username: profile.displayName,
-        // Other user info mappings
-        email: profile.emails[0].value,
-        google: {
-          id: profile.id,
+      } 
+        // No user exists by Google ID or email, create a new user
+        const newUser = await User.create({
+          username: profile.displayName,
           email: profile.emails[0].value,
-        },
-        isOAuthUser: true,
-      });
-      const token = generateToken(newUser._id);
-      done(null, { user: newUser, token }); // Include token in the user object
-
-      done(null, newUser);
+          google: {
+            id: profile.id,
+            email: profile.emails[0].value,
+          },
+          isOAuthUser: true,
+        });
+        const token = generateToken(newUser._id);
+        done(null, { user: newUser, token }); // Include token in the user object
+      
     })
   )
 );
+
 
 //@desc signup
 //@route POST /api/v1/auth/signup
@@ -70,9 +91,13 @@ exports.login = asyncHandler(async (req, res, next) => {
   //1- check if password and emaail in the body
   //2- check if user exist & check if password is correct
   const user = await User.findOne({ email: req.body.email });
+  if (!user.password) {
+    return next(new ApiError("incorrect password or email", 401));
+  }
   if (!user || !(await bcrypt.compare(req.body.password, user.password))) {
     return next(new ApiError("incorrect password or email", 401));
   }
+
   //3- generate token
   const token = generateToken(user._id);
   //3- send response to client side
@@ -133,7 +158,7 @@ exports.forgotPassword = asyncHandler(async (req, res, next) => {
 
   await user.save();
 
-  const emailMessage = `Hi ${user.name},\n we recived a request to reset your password on your E-shop Account. 
+  const emailMessage = `Hi ${user.username},\n we recived a request to reset your password on your E-shop Account. 
   \n ${resetCode} \n enter this code to complete the reset \n thanks for helping us keep your account secure.\n 
   the E-shop Team`;
   //3-send the reset code via email

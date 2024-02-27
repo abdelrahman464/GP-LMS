@@ -25,7 +25,7 @@ const userShcema = mongoose.Schema(
           return !this.isOAuthUser;
         },
         "password required",
-      ], // Add a custom validator or a condition
+      ], 
       minlength: [8, "too short Password"],
     },
     isOAuthUser: {

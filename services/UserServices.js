@@ -67,28 +67,10 @@ exports.updateUser = asyncHandler(async (req, res, next) => {
   res.status(200).json({ data: user });
 });
 
-exports.changeUserPassword = asyncHandler(async (req, res, next) => {
-  const user = await User.findByIdAndUpdate(
-    req.params.id,
-    {
-      password: await bcrypt.hash(req.body.password, 12),
-      passwordChangedAt: Date.now(),
-    },
-    {
-      new: true,
-    }
-  );
-  if (!user) {
-    return next(new ApiError(`No document For this id ${req.params.id}`, 404));
-  }
-  res.status(200).json({ data: user });
-});
-
 //@desc delete User
 //@route DELETE /api/v1/user/:id
 //@access private
 exports.deleteUser = factory.deleteOne(User);
-
 //@desc get logged user data
 //@route GET /api/v1/user/getMe
 //@access private/protect
@@ -102,6 +84,11 @@ exports.getLoggedUserData = asyncHandler(async (req, res, next) => {
 //@route PUT /api/v1/user/changeMyPassword
 //@access private/protect
 exports.updateLoggedUserPassword = asyncHandler(async (req, res, next) => {
+  //check if user is oauth user
+  if (req.user.isOAuthUser) {
+    return next(new ApiError("You can't change password for oauth user", 400));
+  }
+
   //update user password passed on user payload (req.user._id)
   const user = await User.findByIdAndUpdate(
     req.user._id,
