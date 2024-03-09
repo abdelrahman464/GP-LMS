@@ -30,7 +30,7 @@ router.get(
     if (req.user && req.user.token) {
       // Redirect the user or send the token directly
       // Example: Redirect with the token in query params
-      res.redirect(`/your-success-page?token=${req.user.token}`);
+      res.status(201).json({ data: req.user, token: req.user.token });
     } else {
       res.redirect("/login?error=authenticationFailed");
     }
