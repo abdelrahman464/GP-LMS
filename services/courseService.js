@@ -43,7 +43,7 @@ exports.createFilterObj = (req, res, next) => {
 exports.createFilterObjToGetMyCourses = async (req, res, next) => {
   let filterObject = {};
   if (req.user.role === "user") {
-    filterObject = { users: req.user._id };
+    filterObject = { users: { $in: [req.user._id] } };
   } else if (req.user.role === "instructor") {
     filterObject = { instructor: req.user._id };
   }
