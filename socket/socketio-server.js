@@ -1,64 +1,89 @@
-const { Server } = require("socket.io");
-const io = new Server();
-
-// Improved data structures for efficient lookups and updates
-const activeUsers = new Map(); // userID => socketID
-const usersInChat = new Map(); // userID => { chatID, socketID }
-const groupChats = new Map(); // chatID => { id, members }
-
-io.on("connection", (socket) => {
-  socket.on("new-user-add", (userId) => {
-    activeUsers.set(userId, socket.id);
-    io.emit("get-users", Array.from(activeUsers.keys()));
-  });
-
-  socket.on("new-user-in-chat", ({ user, chat }) => {
-    usersInChat.set(user, { chat, socketId: socket.id });
-  });
-
-  socket.on("user-leave-chat", ({ user, chat }) => {
-    if (usersInChat.has(user) && usersInChat.get(user).chat === chat) {
-      usersInChat.delete(user);
-    }
-  });
-
-  socket.on("disconnect", () => {
-    activeUsers.delete(Array.from(activeUsers.keys()).find(key => activeUsers.get(key) === socket.id));
-    usersInChat.forEach((value, key) => {
-      if (value.socketId === socket.id) {
-        usersInChat.delete(key);
+const io = require('socket.io')(9000
+  //     , {
+  //     cors: {
+  //         origin: "http://localhost:3000",
+  //     },
+  // }
+  );
+  
+  let users = [];
+  
+  // Add a user to the users list
+  const addUser = (userId, socketId, roomId = null) => {
+      const user = users.find(user => user.userId === userId);
+      if (user) {
+          user.socketId = socketId;
+          user.roomId = roomId; // Update the room ID if the user rejoins or changes rooms
+      } else {
+          users.push({ userId, socketId, roomId });
       }
-    });
-    io.emit("get-users", Array.from(activeUsers.keys()));
-  });
-
-  socket.on("send-message", (data) => {
-    const { receiverId, chatType, message, senderId, chatId } = data;
-    if (chatType === "user") {
-      const userSocketId = activeUsers.get(receiverId);
-      if (userSocketId && usersInChat.get(receiverId)?.chat === chatId) {
-        io.to(userSocketId).emit("receive-message", message);
+  };
+  
+  // Remove a user from the users list
+  const removeUser = (socketId) => {
+      users = users.filter(user => user.socketId !== socketId);
+  };
+  
+  // Get a user's socket ID
+  const getUserSocketId = (userId) => {
+      const user = users.find(user => user.userId === userId);
+      return user ? user.socketId : null;
+  };
+  
+  // Send a private message to a specific user
+  const sendPrivateMessage = (socket, { senderId, receiverId, text }) => {
+      const receiverSocketId = getUserSocketId(receiverId);
+      if (receiverSocketId) {
+          io.to(receiverSocketId).emit("receiveMessage", { senderId, text, private: true });
+      } else {
+          socket.emit("errorMessage", "User not found or offline.");
       }
-    } else if (chatType === "group") {
-      const groupChat = groupChats.get(receiverId);
-      groupChat?.members.forEach(member => {
-        if (member !== senderId && usersInChat.get(member)?.chat === chatId) {
-          io.to(activeUsers.get(member)).emit("receive-group-message", message);
-        }
+  };
+  
+  // Send a message to a group chat
+  const sendGroupMessage = (socket, { senderId, roomId, text }) => {
+      socket.to(roomId).emit("receiveMessage", { senderId, text, private: false });
+  };
+  
+  io.on("connection", (socket) => {
+      console.log(`User connected: ${socket.id}`);
+  
+      // User adds themselves with a userId
+      socket.on("addUser", ({ userId }) => {
+          addUser(userId, socket.id);
+          console.log(`User ${userId} connected`);
       });
-    }
+  
+      // Joining a room
+      socket.on("joinRoom", ({ userId, roomId }) => {
+          addUser(userId, socket.id, roomId);
+          socket.join(roomId);
+          console.log(`User ${userId} joined room ${roomId}`);
+      });
+  
+      // Leaving a room
+      socket.on("leaveRoom", ({ userId, roomId }) => {
+          socket.leave(roomId);
+          console.log(`User ${userId} left room ${roomId}`);
+      });
+  
+      // User sends a message
+      socket.on("sendMessage", (messageData) => {
+          if (messageData.roomId) {
+              // Group message
+              sendGroupMessage(socket, messageData);
+          } else {
+              // Private message
+              sendPrivateMessage(socket, messageData);
+          }
+      });
+  
+      // User disconnects
+      socket.on("disconnect", () => {
+          removeUser(socket.id);
+          console.log(`User disconnected: ${socket.id}`);
+      });
   });
-
-  socket.on("create-group-chat", ({ chatId, members }) => {
-    groupChats.set(chatId, { id: chatId, members });
-  });
-
-  socket.on("add-user-to-group-chat", ({ chatId, userId }) => {
-    const groupChat = groupChats.get(chatId);
-    if (groupChat && !groupChat.members.includes(userId)) {
-      groupChat.members.push(userId);
-    }
-  });
-});
-
-module.exports = io;
+  
+  console.log('Socket.IO server is running.');
+  

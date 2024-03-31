@@ -1,5 +1,4 @@
 const path = require("path");
-const http = require("http");
 
 const passport = require('passport');
 
@@ -18,11 +17,10 @@ const dotenv = require("dotenv");
 
 dotenv.config({ path: "config.env" });
 
-//database2
+//database
 const dbConnection = require("./config/database");
-const socketIOServer = require("./socket/socketio-server");
-//route
 
+//route
 const mountRoutes = require("./Routers");
 
 //error class that i made in utils to handle operational error
@@ -38,14 +36,7 @@ mongoose.set("strictQuery", false);
 
 //express app
 const app = express();
-const CompleteServer = http.createServer(app);
 
-// Integrate Socket.IO with the HTTP server
-socketIOServer.attach(CompleteServer, {
-  cors: {
-    origin: "https://testing-chat-app.vercel.app",
-  },
-});
 
 //enable other domains access your application
 app.use(cors());
@@ -106,7 +97,7 @@ app.all("*", (req, res, next) => {
 app.use(globalError);
 
 const PORT = process.env.PORT || 8000;
-const server = CompleteServer.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`app running on ${PORT}`);
 });
 
