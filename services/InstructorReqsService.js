@@ -120,19 +120,18 @@ exports.acceptRequest = async (req, res, next) => {
   if (!request) {
     return next(new ApiError(`Reuest Not Found`, 404));
   }
-  console.log(request);
+
   //SEND EMAIL TO   MarketRequest.user Telling him he he been marketer
   const requestOwner = await User.findOneAndUpdate(
     { _id: request.user._id },
     { role: "instructor" }
   );
-  console.log(requestOwner);
+
   try {
     const emailMessage = `Hi ${requestOwner.name}, 
-                          \n your request to be a marketer has been accepted by the admin
-                          \n your request to be a marketer has been accepted by the admin
-                          \n please login to your account to see your new role
-                          \n the new-normal Team`;
+                          \n ycongratulations
+                          \n your request to be an instructor has been accepted by the admin
+                          \n please login to your account to see your new role`;
 
     await sendEmail({
       to: requestOwner.email,
