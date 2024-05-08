@@ -18,10 +18,13 @@ const multerOptions = () => {
   const multerStorage = multer.memoryStorage();
 
   const multterFilter = function (req, file, cb) {
-    if (file.mimetype.startsWith("image")) {
+    if (
+      file.mimetype.startsWith("image") ||
+      file.mimetype.startsWith("application/pdf")
+    ) {
       cb(null, true);
     } else {
-      cb(new ApiError("Only image Allowed", 400), false);
+      cb(new ApiError("Only image or pdf Allowed ", 400), false);
     }
   };
   const upload = multer({ storage: multerStorage, fileFilter: multterFilter });

@@ -16,6 +16,8 @@ const LessonRoute = require("./lessonRoute");
 const sectionRoute = require("./sectionRoute");
 const OrderRoute = require("./OrderRoute");
 
+const InstructorRoute = require("./instructorsReqsRoute");
+
 const mountRoutes = (app) => {
   // Mount Routes
   app.use("/api/v1/users", userRoute);
@@ -35,5 +37,7 @@ const mountRoutes = (app) => {
   app.use("/api/v1/posts", PostRoute);
   app.use("/api/v1/postComments", PostCommentRoute);
   app.use("/api/v1/postReacts", PostReactRoute);
+
+  app.use("/api/v1/instructorsReqs", InstructorRoute);
 };
 module.exports = mountRoutes;
