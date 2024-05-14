@@ -21,6 +21,7 @@ const {
   addUserToCourse,
   getCourseUsers,
   createFilterObjToGetMyCourses,
+  getInstructorCourses,
 } = require("../services/courseService");
 const authServices = require("../services/authServices");
 // nested routes
@@ -104,6 +105,12 @@ router.delete(
   authServices.allowedTo("instructor", "admin"),
   checkCourseIdParamValidator,
   deleteCourse
+);
+router.get(
+  "/instructorCourses/:instrucorId",
+  authServices.protect,
+  authServices.allowedTo("admin"),
+  getInstructorCourses
 );
 
 module.exports = router;

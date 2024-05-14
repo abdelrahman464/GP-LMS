@@ -4,13 +4,14 @@ const {
   createUserValidator,
   updateUserValidator,
   deleteUserValidator,
- 
+
   updateLoggedUserValidator,
   changeLoggedUserPasswordValidator,
 } = require("../utils/validators/userValidator");
 const authServices = require("../services/authServices");
 const {
   getUsers,
+  createFilterToGetInstructors,
   createUser,
   getUser,
   updateUser,
@@ -27,6 +28,12 @@ const {
 const router = express.Router();
 
 router.get("/getMe", authServices.protect, getLoggedUserData, getUser);
+router.get(
+  "/getInstructors",
+  authServices.protect,
+  createFilterToGetInstructors,
+  getUsers
+);
 
 router.put(
   "/changeMyPassword",

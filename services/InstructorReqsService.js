@@ -42,15 +42,15 @@ exports.handleRequestsPdfs = asyncHandler(async (req, res, next) => {
     // Save PDF into our db
     req.body.cv = pdfFileName;
   }
-  // if (req.files.identity) {
-  //   const File = req.files.identity[0];
-  //   const FileName = `marketingReq-identity-${uuidv4()}-${Date.now()}.pdf`;
-  //   const filePath = `uploads/marketing/identities/${FileName}`;
-  //   // Save the PDF file using fs
-  //   fs.writeFileSync(filePath, File.buffer);
-  //   // Save PDF into our db
-  //   req.body.identity = FileName;
-  // }
+  if (req.files.identity) {
+    const File = req.files.identity[0];
+    const FileName = `marketingReq-identity-${uuidv4()}-${Date.now()}.pdf`;
+    const filePath = `uploads/marketing/identities/${FileName}`;
+    // Save the PDF file using fs
+    fs.writeFileSync(filePath, File.buffer);
+    // Save PDF into our db
+    req.body.identity = FileName;
+  }
   next();
 });
 //--------------------------------------------------------------------------------------------
@@ -58,7 +58,6 @@ exports.canSendRequest = async (req, res, next) => {
   const request = await InstructorsReq.findOne({
     user: req.user._id,
   });
-  // return res.json(withdrawRequest)
 
   if (!request) {
     return next();
@@ -112,19 +111,21 @@ exports.deleteOne = factory.deleteOne(InstructorsReq);
 exports.acceptRequest = async (req, res, next) => {
   const { id } = req.params;
 
-  //get user marketLog and update his role
+  //get user
   const request = await InstructorsReq.findOneAndUpdate(
     { _id: id },
-    { status: "accepted" }
+    { status: "accepted" },
+    { new: true }
   );
   if (!request) {
     return next(new ApiError(`Reuest Not Found`, 404));
   }
 
-  //SEND EMAIL TO   MarketRequest.user Telling him he he been marketer
+  //SEND EMAIL TO
   const requestOwner = await User.findOneAndUpdate(
     { _id: request.user._id },
-    { role: "instructor" }
+    { role: "instructor" },
+    { new: true }
   );
 
   try {
@@ -150,7 +151,7 @@ exports.acceptRequest = async (req, res, next) => {
 exports.rejectRequest = async (req, res, next) => {
   const { id } = req.params;
 
-  //get user marketLog and update his role
+  //get user  and update his role
   const request = await InstructorsReq.findOneAndUpdate(
     { _id: id },
     { status: "reject" }
@@ -159,8 +160,8 @@ exports.rejectRequest = async (req, res, next) => {
   if (!request) {
     return next(new ApiError(`Reuest Not Found`, 404));
   }
-  //SEND EMAIL TO   MarketRequest.user Telling him he he been marketer
-  const requestOwner = await User.findById(requestOwner.user._id);
+  //SEND EMAIL TO  USER
+  const requestOwner = await User.findById(request.user._id);
   try {
     const emailMessage = `Hi ${requestOwner.name}, 
                           \n unfortunately 

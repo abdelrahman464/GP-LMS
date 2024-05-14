@@ -5,6 +5,7 @@ const Course = require("../models/courseModel");
 const User = require("../models/userModel");
 const factory = require("./handllerFactory");
 const { uploadSingleImage } = require("../middlewares/uploadImageMiddleware");
+const ApiError = require("../utils/apiError");
 
 //upload Singel image
 exports.uploadCourseImage = uploadSingleImage("image");
@@ -71,44 +72,45 @@ exports.relatedCourses = asyncHandler(async (req, res) => {
   res.status(200).json({ data: courses });
 });
 // to be done when user purchase a course
-exports.addUserToCourse = asyncHandler(async (req, res) => {
+exports.addUserToCourse = asyncHandler(async (req, res, next) => {
   const { courseId } = req.body;
   const userId = req.user._id;
 
   const course = await Course.findById(courseId);
 
   if (!Course) {
-    res.status(400).json({ status: `no course for that id: ${courseId}` });
+    return next(new ApiError(`Not Found`, 404));
   }
   const startDate = new Date();
 
   // Add the user object to the users array
-  const newUser = {
-    user: userId,
-    start_date: startDate,
-  };
-
-  course.users.push(newUser);
-
-  await course.save();
+  await Course.findByIdAndUpdate(
+    courseId,
+    {
+      $push: {
+        users: {
+          user: userId,
+          start_date: startDate,
+        },
+      },
+    },
+    { new: true }
+  );
 
   res.status(200).json({ status: "success", course: course });
 });
 //@desc get course users
 //@route Get courses/courseUsers
 //@access protected user
-exports.getCourseUsers = asyncHandler(async (req, res) => {
+exports.getCourseUsers = asyncHandler(async (req, res, next) => {
   const { courseId } = req.body;
   const course = await Course.findById(courseId);
   if (!course) {
-    return res
-      .status(400)
-      .json({ status: `no course for that id: ${courseId}` });
+    return next(new ApiError(`no course for that id`, 400));
   }
   const usersInCourse = course.users.map((user) => user.toString());
   const users = await User.find({ _id: { $in: usersInCourse } });
-  if (!users)
-    return res.status(400).json({ status: "no users in this course" });
+  if (!users) return next(new ApiError(`no users in this course`, 400));
 
   return res.status(200).json({ status: "success", usersInCourse });
 });
@@ -130,8 +132,29 @@ exports.checkCourseAuthority = (req, res, next) =>
 
     if (!course) {
       //check whether has access on courses
-      res.json({ msg: "not allowed" });
+      return next(new ApiError(`Not Allowed`, 403));
     }
     // res.json(package)
     next();
   });
+
+//@desc get instrucor course
+//@route Get courses/instructorCourses/:instrucorId
+//@access protected user
+exports.getInstructorCourses = asyncHandler(async (req, res, next) => {
+  const { instrucorId } = req.body;
+  const user = await User.findOne({ _id: instrucorId, role: "instructor" });
+  if (!user) {
+    return next(
+      new ApiError(
+        `the instructor you have entered must have role instructor`,
+        403
+      )
+    );
+  }
+  const courses = await Course.find({ instructor: instrucorId });
+  if (!courses) {
+    return next(new ApiError(`no courses for this instructor`, 404));
+  }
+  return res.status(200).json({ status: "success", courses });
+});

@@ -32,6 +32,15 @@ exports.resizeImage = asyncHandler(async (req, res, next) => {
 //@desc get list of user
 //@route GET /api/v1/users
 //@access private
+//filter to get public posts only
+exports.createFilterToGetInstructors = async (req, res, next) => {
+  const filterObject = { role: "instructor" };
+  req.filterObj = filterObject;
+  next();
+};
+//@desc get list of user
+//@route GET /api/v1/users
+//@access private
 exports.getUsers = factory.getALl(User);
 
 //@desc get specific User by id
