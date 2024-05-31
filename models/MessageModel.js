@@ -2,11 +2,11 @@ const mongoose = require("mongoose");
 
 const MessageSchema = new mongoose.Schema(
   {
-    chatId: {
+    chat: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Chat",
     },
-    senderId: {
+    sender: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },
@@ -27,10 +27,9 @@ const MessageSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
-
     reactions: [
       {
-        userId: {
+        user: {
           type: mongoose.Schema.Types.ObjectId,
           ref: "User",
         },
@@ -41,66 +40,45 @@ const MessageSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Message",
     },
-    forwardedFrom: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-    },
   },
   { timestamps: true }
 );
 MessageSchema.pre(/^find/, function (next) {
   this.populate({
-    path: "forwardedFrom",
+    path: "sender",
     select: "username profileImg",
-  })
-    .populate({
-      path: "reactions",
+  }).populate({
+    path: "repliedTo", // Populate repliedTo field
+    select: "sender text media",
+    populate: {
+      path: "sender", // Populate sender within repliedTo field
       select: "username profileImg",
-    })
-    .populate({
-      path: "senderId",
-      select: "username profileImg",
-    })
-    .populate({
-      path: "repliedTo", // Populate repliedTo field
-      select: "senderId text media",
-      populate: {
-        path: "senderId", // Populate senderId within repliedTo field
-        select: "username profileImg",
-      },
-    });
+    },
+  });
+
   next();
 });
-MessageSchema.post(/^save/, async function (doc, next) {
-  try {
-    const populatedDoc = await this.constructor.findById(doc._id)
-      .populate({
-        path: 'reactions',
-        select: 'username profileImg',
-      })
-      .populate({
-        path: 'senderId',
-        select: 'username profileImg',
-      })
-      .populate({
-        path: 'repliedTo',
-        select: 'senderId text media',
-        populate: {
-          path: 'senderId',
-          select: 'username profileImg',
-        },
-      });
-
-    // Replace the original document with the populated one
-    Object.assign(doc, populatedDoc._doc);
-
-    next();
-  } catch (err) {
-    next(err);
+const setImageURL = (doc) => {
+  //return image base url + iamge name
+  if (doc.media) {
+    const mediaListWithUrl = [];
+    doc.media.forEach((m) => {
+      const mediaUrl = `${process.env.BASE_URL}/messages/${m}`;
+      mediaListWithUrl.push(mediaUrl);
+    });
+    doc.media = mediaListWithUrl;
   }
+};
+
+//after initializ the doc in db
+// check if the document contains image
+// it work with findOne,findAll,update
+MessageSchema.post("init", (doc) => {
+  setImageURL(doc);
 });
-
-
-
+// it work with create
+MessageSchema.post("save", (doc) => {
+  setImageURL(doc);
+});
 const Message = mongoose.model("Message", MessageSchema);
 module.exports = Message;

@@ -77,7 +77,7 @@ if (process.env.NODE_ENV === "development") {
 // Limit each IP to 100 requests per `window` (here, per 15 minutes)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 1000,
+  max: 10000,
   message:
     "Too many requsts created from this IP, please try again after an 15minute interval",
 });
@@ -96,7 +96,7 @@ app.all("*", (req, res, next) => {
 
 app.use(globalError);
 
-const PORT = process.env.PORT || 8000;
+const PORT = process.env.PORT || 1700;
 const server = app.listen(PORT, () => {
   console.log(`app running on ${PORT}`);
 });

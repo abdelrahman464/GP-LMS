@@ -1,210 +1,380 @@
 const asyncHandler = require("express-async-handler");
+const mongoose = require("mongoose");
 const Chat = require("../models/ChatModel");
 const Message = require("../models/MessageModel");
+const Notification = require("../models/notificationModel");
+const ApiError = require("../utils/apiError");
 
 //@desc create a chat room between 2 users
 //@route POST /api/v1/chat/:receiverId
-//@access protected       => Tested successfully on postman by Paula.
+//@access protected
 exports.createChat = asyncHandler(async (req, res, next) => {
-  const senderId = req.user._id;
-  const { receiverId } = req.params;
+  try {
+    const senderId = req.user._id;
+    const { receiverId } = req.params;
 
-  // Check if a chat already exists between sender and receiver
-  const existingChat = await Chat.findOne({
-    participants: {
-      $all: [{ userId: senderId }, { userId: receiverId }],
-    },
-  });
+    // Check if a chat already exists between sender and receiver
+    const existingChat = await Chat.findOne({
+      $and: [
+        { "participants.user": senderId },
+        { "participants.user": receiverId },
+      ],
+    });
 
-  if (existingChat) {
-    return res
-      .status(400)
-      .json({ error: "Chat already exists between these users" });
+    if (existingChat) {
+      return res.status(200).json({
+        message: "Chat already exists between these users",
+        data: existingChat,
+      });
+    }
+
+    // Create a new chat
+    const newChat = await Chat.create({
+      participants: [
+        { user: senderId, isAdmin: true },
+        { user: receiverId, isAdmin: true },
+      ],
+    });
+
+    // Create a notification for the receiver
+    await Notification.create({
+      user: receiverId,
+      message: `${req.user.username} has started a chat with you`,
+      chat: newChat._id,
+      type: "chat",
+    });
+
+    res.status(201).json({ data: newChat });
+  } catch (error) {
+    next(error);
   }
-
-  const newChat = await Chat.create({
-    participants: [{ userId: senderId }, { userId: receiverId }],
-  });
-
-  res.status(201).json({ data: newChat });
 });
+
+//@desc get all user chat rooms
+//@route GET /api/v1/chat/myChats
+//@access privat
+exports.getMyChats = async (req, res, next) => {
+  try {
+    const baseUrl = process.env.BASE_URL; // Set your domain URL here
+    const chats = await Chat.aggregate([
+      {
+        $match: { "participants.user": mongoose.Types.ObjectId(req.user._id) },
+      },
+      {
+        $lookup: {
+          from: "messages",
+          let: { chatId: "$_id" },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$chat", "$$chatId"] } } },
+            { $sort: { createdAt: -1 } },
+            { $limit: 1 },
+            {
+              $lookup: {
+                from: "users",
+                localField: "sender",
+                foreignField: "_id",
+                as: "senderDetails",
+              },
+            },
+            {
+              $addFields: {
+                media: {
+                  $map: {
+                    input: "$media",
+                    as: "file",
+                    in: { $concat: [baseUrl, "/messages/", "$$file"] }, // Adjust the path as necessary
+                  },
+                },
+              },
+            },
+            {
+              $project: {
+                text: 1,
+                media: 1,
+                createdAt: 1,
+                sender: 1,
+                senderDetails: { $arrayElemAt: ["$senderDetails", 0] },
+              },
+            },
+          ],
+          as: "lastMessage",
+        },
+      },
+      { $unwind: "$participants" },
+      {
+        $lookup: {
+          from: "users",
+          localField: "participants.user",
+          foreignField: "_id",
+          as: "participants.userDetails",
+        },
+      },
+      { $unwind: "$participants.userDetails" },
+      {
+        $addFields: {
+          "participants.userDetails.profileImg": {
+            $cond: {
+              if: "$participants.userDetails.profileImg",
+              then: {
+                $concat: [
+                  baseUrl,
+                  "/users/",
+                  "$participants.userDetails.profileImg",
+                ],
+              },
+              else: null,
+            },
+          },
+        },
+      },
+      {
+        $group: {
+          _id: "$_id",
+          participants: { $push: "$participants" },
+          root: { $mergeObjects: "$$ROOT" },
+        },
+      },
+      {
+        $replaceRoot: {
+          newRoot: {
+            $mergeObjects: ["$root", "$$ROOT"],
+          },
+        },
+      },
+      { $sort: { "lastMessage.createdAt": -1 } },
+
+      {
+        $project: {
+          participants: 1,
+          isGroupChat: 1,
+
+          groupName: 1,
+          description: 1,
+          archived: 1,
+          lastMessage: 1,
+          _id: 1,
+        },
+      },
+    ]);
+
+    res.status(200).json({
+      status: "success",
+      results: chats.length,
+      data: chats,
+    });
+  } catch (error) {
+    console.error("Error fetching chats:", error);
+    res.status(500).json({
+      status: "error",
+      message: "Failed to fetch chats",
+    });
+  }
+};
 
 //@desc create a group chat
 //@route POST /api/v1/chat/group
-//@access protected       => Tested successfully on postman by Paula.
+//@access protected
 exports.createGroupChat = asyncHandler(async (req, res, next) => {
   const { participantIds, groupName, description } = req.body;
 
-  const groupCreator = {
-    userId: req.user._id.toString(),
-    isAdmin: "true",
-  };
-  participantIds.push(groupCreator);
+  const groupCreatorId = req.user._id.toString();
 
+  // Ensure the creator is not duplicated in participantIds array
+  const filteredParticipantIds = participantIds.filter(
+    (participant) => participant !== groupCreatorId
+  );
+
+  // Create the new group chat
   const newGroupChat = await Chat.create({
-    participants: participantIds,
+    participants: [
+      ...filteredParticipantIds,
+      { user: groupCreatorId, isAdmin: true },
+    ],
     isGroupChat: true,
     creator: req.user._id,
     groupName,
     description,
   });
+
+  // Send notification to all participants (except the creator)
+  const notifications = filteredParticipantIds.map(async (participant) => {
+    await Notification.create({
+      user: participant.user,
+      message: `${req.user.username} has added you to a group chat`,
+      chat: newGroupChat._id,
+      type: "chat",
+    });
+  });
+
+  await Promise.all(notifications);
+
   res.status(201).json({ data: newGroupChat });
 });
-
-//@desc Get group chats of the logged-in user with detailed participant information
-//@route GET /api/v1/chat/loggedUserGroupChats
-//@access protected       => Tested successfully on postman by Paula.
-// exports.getLoggedUserGroupChats = asyncHandler(async (req, res, next) => {
-//   const loggedUserId = req.user._id;
-
-//   // Find group chats where the logged-in user is a participant
-//   const groupChats = await Chat.find({
-//     isGroupChat: true, // Assuming isGroupChat differentiates group chats from direct chats
-//     "participants.userId": loggedUserId,
-//   }).populate({
-//     path: "participants.userId",
-//     select: "username",
-//   });
-
-//   res.status(200).json({ data: groupChats });
-// });
-
-//@desc Get chats of the logged-in user excluding direct one-on-one chats
-//@route GET /api/v1/chat/loggedUserChats
-//@access protected
-// exports.getLoggedUserChats = asyncHandler(async (req, res, next) => {
-//   const loggedUserId = req.user._id;
-
-//   // Find chats where the logged-in user is a participant and it's not a group chat
-//   const userChats = await Chat.find({
-//     "participants.userId": loggedUserId, // Checking if the logged-in user exists in participants
-//     isGroupChat: false, // Filtering out group chats
-//   }).populate({
-//     path: "participants.userId", // Populating the username from the participants
-//     select: "username",
-//   });
-
-//   res.status(200).json({ data: userChats });
-// });
-
+//-------------------------------------------------------------------------------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------------------------------------------------------------
 //@desc Add a participant to a chat with a role
 //@route PUT /api/v1/chat/:chatId/addParticipant
 //@access protected
 exports.addParticipantToChat = asyncHandler(async (req, res, next) => {
   const { chatId } = req.params;
-  const { userId, isAdmin } = req.body; // ID of the participant to be added and their role
+  const { user, isAdmin } = req.body; // ID of the participant to be added and their role
   const loggedUserId = req.user._id; // logged user id
 
   const chat = await Chat.findById(chatId);
 
   if (!chat) {
-    return res.status(404).json({ error: "Chat not found" });
+    return next(new ApiError("Chat not found", 404));
   }
 
   // Find the logged-in user in the chat to verify admin privileges
   const loggedUser = chat.participants.find(
-    (participant_) => String(participant_.userId._id) === String(loggedUserId)
+    (participant_) => String(participant_.user._id) === String(loggedUserId)
   );
 
   if (!loggedUser || !loggedUser.isAdmin) {
-    return res
-      .status(403)
-      .json({ error: "Unauthorized: You are not an admin in this chat" });
+    return next(
+      new ApiError("Unauthorized: You are not an admin in this Group", 403)
+    );
   }
 
   // Check if the user is already a participant in the chat
   const existingParticipant = chat.participants.find(
-    (participant) => String(participant.userId) === userId
+    (participant) => String(participant.user) === user
   );
 
   if (existingParticipant) {
-    return res
-      .status(400)
-      .json({ error: "User is already a participant in the chat" });
+    return next(new ApiError("User is already a participant in the chat", 400));
   }
 
-  // Add the new participant to the chat with their role
-  chat.participants.push({ userId, isAdmin });
-  await chat.save();
+  // Update the chat document to add the new participant with their role
+  const thisChat = await Chat.findByIdAndUpdate(
+    chatId,
+    { $push: { participants: { user, isAdmin } } },
+    { new: true } // To return the modified document
+  );
 
-  res.status(200).json({ data: chat });
+  if (thisChat) {
+    await Notification.create({
+      user: user,
+      message: `${req.user.username} has added you to a group chat`,
+      chat: thisChat._id,
+      type: "chat",
+    });
+  }
+
+  res.status(200).json({ data: "user added successfully" });
 });
-
 //@desc Remove a participant from a chat
 //@route PUT /api/v1/chat/:chatId/removeParticipant
 //@access protected
 exports.removeParticipantFromChat = asyncHandler(async (req, res, next) => {
   const { chatId } = req.params;
-  const { userId } = req.body; // ID of the participant to be removed
+  const { user } = req.body; // ID of the participant to be removed
+  const loggedUserId = req.user._id; // logged user id
 
   const chat = await Chat.findById(chatId);
 
   if (!chat) {
-    return res.status(404).json({ error: "Chat not found" });
+    return next(new ApiError("Chat not found", 404));
+  }
+  // Find the logged-in user in the chat to verify admin privileges
+  const loggedUser = chat.participants.find(
+    (participant_) => String(participant_.user._id) === String(loggedUserId)
+  );
+
+  if (!loggedUser || !loggedUser.isAdmin) {
+    return next(
+      new ApiError("Unauthorized: You are not an admin in this Group", 403)
+    );
   }
 
   // Find the index of the participant in the chat
   const participantIndex = chat.participants.findIndex(
-    (participant) => String(participant.userId._id) === userId
+    (participant) => String(participant.user._id) === user
   );
 
   if (participantIndex === -1) {
-    return res.status(400).json({ error: "Participant not found in the chat" });
+    return next(new ApiError("Participant not found in the chat", 400));
   }
 
-  // Remove the participant from the chat
-  chat.participants.splice(participantIndex, 1);
-  await chat.save();
+  // Update the chat document to remove the participant
+  const thisChat = await Chat.findByIdAndUpdate(
+    chatId,
+    { $pull: { participants: { user: user } } },
+    { new: true } // To return the modified document
+  );
 
-  res.status(200).json({ data: chat });
+  if (thisChat) {
+    await Notification.create({
+      user: user,
+      message: `${req.user.username} has added you to a group chat`,
+      chat: thisChat._id,
+      type: "chat",
+    });
+  }
+
+  res.status(200).json({ data: "user removed successfully" });
 });
 //@desc Update participant role in a chat
 //@route PUT /api/v1/chat/:chatId/updateParticipantRole
 //@access protected
 exports.updateParticipantRoleInChat = asyncHandler(async (req, res, next) => {
-  const { userId, isAdmin } = req.body; // Chat ID, User ID, and desired role
+  const { user, isAdmin } = req.body; // Chat ID, User ID, and desired role
   const { chatId } = req.params;
   const loggedUserId = req.user._id; // logged user id
 
   const chat = await Chat.findById(chatId);
   if (!chat) {
-    return res.status(404).json({ error: "Chat not found" });
+    return next(new ApiError("Chat not found", 404));
   }
 
   // Find the logged-in user in the chat to verify admin privileges
   const loggedUser = chat.participants.find(
-    (participant_) => String(participant_.userId._id) === String(loggedUserId)
+    (participant_) => String(participant_.user._id) === String(loggedUserId)
   );
 
   if (!loggedUser || !loggedUser.isAdmin) {
-    return res
-      .status(403)
-      .json({ error: "Unauthorized: You are not an admin in this chat" });
+    return next(
+      new ApiError("Unauthorized: You are not an admin in this Group", 403)
+    );
   }
 
   // Find the participant to update their role
   const participantToUpdate = chat.participants.find(
-    (participant_) => String(participant_.userId._id) === userId
+    (participant_) => String(participant_.user._id) === user
   );
 
   if (!participantToUpdate) {
-    return res.status(404).json({ error: "Participant not found in the chat" });
+    return next(new ApiError("Participant not found in the chat", 404));
   }
 
   // Check if the userId from body matches the creator of the chat
   const creatorOfChat = chat.creator._id; // Assuming the creator is the first participant
 
-  if (String(creatorOfChat) === userId) {
-    return res
-      .status(403)
-      .json({ error: "Unauthorized: Cannot update the creator's role" });
+  if (String(creatorOfChat) === user) {
+    return next(
+      new ApiError("Unauthorized: Cannot update the creator's role", 403)
+    );
   }
 
-  // Update the participant's role
-  participantToUpdate.isAdmin = isAdmin;
-  await chat.save();
+  // Update the participant's role directly in the database
+  const thisChat = await Chat.updateOne(
+    { _id: chatId, "participants.user": user },
+    { $set: { "participants.$.isAdmin": isAdmin } }
+  );
 
-  res.status(200).json({ data: chat });
+  if (thisChat) {
+    await Notification.create({
+      user: user,
+      message: `${req.user.username} has updated your role in a group chat to ${
+        isAdmin ? "admin" : "participant"
+      }`,
+      chat: thisChat._id,
+      type: "chat",
+    });
+  }
+
+  res.status(200).json({ data: "user updated successfully" });
 });
 
 //@desc Get details of a specific chat including participants' details
@@ -213,18 +383,35 @@ exports.updateParticipantRoleInChat = asyncHandler(async (req, res, next) => {
 exports.getChatDetails = asyncHandler(async (req, res, next) => {
   const { chatId } = req.params;
 
-  const chat = await Chat.findById(chatId);
-  // .populate({
-  //   path: "participants.userId",
-  //   select: "username email profileImg",
-  // })
-  // .populate("pinnedMessages.messageId", "text senderId"); // Populate pinned message details
+  // Fetch the chat details along with the user details for each participant
+  const chat = await Chat.findById(chatId).populate({
+    path: "participants.user",
+    select:
+      "_id username email password isOAuthUser role active createdAt updatedAt __v profileImg",
+  });
 
   if (!chat) {
     return res.status(404).json({ error: "Chat not found" });
   }
+  // get chat media in messages belong to this chat
+  const messages = await Message.find({ chat: chatId, media: { $ne: [] } });
+  const mediaUrls = messages.map((message) => message.media).flat(); // Flattens the array of arrays into a single array
 
-  res.status(200).json({ data: chat });
+  // Transform the participants structure to include userDetails
+  const transformedParticipants = chat.participants.map((participant) => ({
+    user: participant.user._id,
+    isAdmin: participant.isAdmin,
+    _id: participant._id,
+    userDetails: participant.user,
+  }));
+
+  const transformedChat = {
+    _id: chat._id,
+    participants: transformedParticipants,
+    isGroupChat: chat.isGroupChat,
+  };
+
+  res.status(200).json({ data: transformedChat, mediaUrls });
 });
 
 //@desc Update chat information (e.g., group name, description)
@@ -233,19 +420,19 @@ exports.getChatDetails = asyncHandler(async (req, res, next) => {
 exports.updateGrpupChat = asyncHandler(async (req, res, next) => {
   const { chatId } = req.params;
   const { groupName, description } = req.body;
-  const userId = req.user._id; // logged user id
+  const user = req.user._id; // logged user id
 
   // Check if the logged-in user is an admin in the group
   const chat = await Chat.findOne({
     _id: chatId,
-    "participants.userId": userId,
+    "participants.user": user,
     "participants.isAdmin": true,
   });
 
   if (!chat) {
-    return res
-      .status(403)
-      .json({ error: "Unauthorized: You are not an admin of this group chat" });
+    return next(
+      new ApiError("Unauthorized: You are not an admin in this Group", 403)
+    );
   }
 
   const updatedChat = await Chat.findByIdAndUpdate(
@@ -255,7 +442,7 @@ exports.updateGrpupChat = asyncHandler(async (req, res, next) => {
   );
 
   if (!updatedChat) {
-    return res.status(404).json({ error: "Chat not found" });
+    return next(new ApiError("Chat not found", 404));
   }
 
   res.status(200).json({ data: updatedChat });
@@ -265,348 +452,167 @@ exports.updateGrpupChat = asyncHandler(async (req, res, next) => {
 //@route DELETE /api/v1/chat/:chatId
 //@access protected
 exports.deleteChat = asyncHandler(async (req, res, next) => {
-  const { chatId } = req.params;
+  try {
+    await mongoose.connection.transaction(async (session) => {
+      // Find and delete the course
+      const chat = await Chat.findByIdAndDelete(req.params.chatId).session(
+        session
+      );
 
-  const chat = await Chat.findById(chatId);
+      // Check if course exists
+      if (!chat) {
+        return next(
+          new ApiError(`chat not found for this id ${req.params.chatId}`, 404)
+        );
+      }
 
-  if (!chat) {
-    return res.status(404).json({ error: "Chat not found" });
+      // Delete associated lessons and reviews
+      await Promise.all([
+        Message.deleteMany({ chat: chat._id }).session(session),
+      ]);
+    });
+
+    // Return success response
+    res.status(204).send();
+  } catch (error) {
+    // Handle any transaction-related errors
+    console.error("Transaction error:", error);
+    if (error instanceof ApiError) {
+      // Forward specific ApiError instances
+      return next(error);
+    }
+    // Handle other errors with a generic message
+    return next(new ApiError("Error during chat deletion", 500));
   }
-
-  // Implement logic to delete associated messages, participants, etc.
-  // Example: Delete associated messages
-  await Message.deleteMany({ chatId });
-
-  await chat.remove(); // Remove the chat
-
-  res.status(200).json({ message: "Chat deleted successfully" });
 });
-
-//@desc get all user chat rooms
-//@route GET /api/v1/chat/myChats
-//@access private
-exports.getMyChats = asyncHandler(async (req, res) => {
-  const userId = req.user._id; // logged user id
-
-  const chats = await Chat.aggregate([
-    {
-      $match: {
-        "participants.userId": userId,
-      },
-    },
-    {
-      $lookup: {
-        from: "messages",
-        let: { chatId: "$_id" },
-        pipeline: [
-          {
-            $match: {
-              $expr: {
-                $eq: ["$chatId", "$$chatId"],
-              },
-            },
-          },
-          {
-            $sort: { createdAt: -1 },
-          },
-          {
-            $limit: 1,
-          },
-        ],
-        as: "lastMessage",
-      },
-    },
-    {
-      $addFields: {
-        lastMessage: { $arrayElemAt: ["$lastMessage", 0] },
-      },
-    },
-    {
-      $sort: { "lastMessage.createdAt": -1 },
-    },
-    {
-      $unwind: "$participants", // Unwind participants array
-    },
-    {
-      $lookup: {
-        from: "users",
-        localField: "participants.userId",
-        foreignField: "_id",
-        as: "userDetails",
-      },
-    },
-    {
-      $addFields: {
-        "participants.username": { $arrayElemAt: ["$userDetails.username", 0] },
-        "participants.profileImg": {
-          $arrayElemAt: ["$userDetails.profileImg", 0],
-        },
-      },
-    },
-    {
-      $project: {
-        userDetails: 0, // Remove the redundant userDetails field
-      },
-    },
-    {
-      $group: {
-        _id: "$_id",
-        chatDetails: { $first: "$$ROOT" }, // Preserve the chat details
-        lastMessage: { $first: "$lastMessage" },
-        participants: { $push: "$participants" }, // Reconstruct the participants array
-      },
-    },
-    {
-      $replaceRoot: {
-        newRoot: {
-          $mergeObjects: [
-            "$chatDetails",
-            { lastMessage: "$lastMessage", participants: "$participants" },
-          ],
-        },
-      },
-    },
-    {
-      $project: {
-        chatDetails: 0, // Remove the redundant chatDetails field
-      },
-    },
-  ]);
-
-  res.status(200).json({ data: chats });
-});
+//filter to get my chats
+exports.createFilterObj = (req, res, next) => {
+  const filterObject = {
+    "participants.user": req.user._id,
+  };
+  req.filterObj = filterObject;
+  next();
+};
 
 //@desc Find a specific chat between two users that the logged-in user is part of
 //@route GET /api/v1/chat/find/:secondPersonId
 //@access private
-exports.findChat = asyncHandler(async (req, res) => {
+exports.findChat = asyncHandler(async (req, res, next) => {
   const loggedUserId = req.user._id; // First participant of the chat
   const { secondPersonId } = req.params; // Second participant of the chat
 
   const chat = await Chat.findOne({
     $and: [
       {
-        "participants.userId": loggedUserId,
+        "participants.user": loggedUserId,
       },
       {
-        "participants.userId": secondPersonId,
+        "participants.user": secondPersonId,
       },
       {
         isGroupChat: false, // Ensuring it's not a group chat
       },
     ],
-  }).populate({
-    path: "participants.userId", // Populate participant details
-    select: "username email", // Select fields from the User model
   });
-
+  if (!chat) {
+    return next(new ApiError("Chat not found", 404));
+  }
   res.status(200).json({ data: chat });
 });
 
 //@desc Pin a message in a chat
 //@route POST /api/v1/chat/:chatId/pin/:messageId
 //@access protected
-exports.pinMessageInChat = asyncHandler(async (req, res) => {
+exports.pinMessageInChat = asyncHandler(async (req, res, next) => {
   const { chatId, messageId } = req.params;
 
   const chat = await Chat.findById(chatId);
 
   if (!chat) {
-    return res.status(404).json({ error: "Chat not found" });
+    return next(new ApiError("Chat not found", 404));
   }
 
   // Check if the message exists in the chat
   const isMessageInChat = chat.pinnedMessages.includes(messageId);
   if (isMessageInChat) {
-    return res
-      .status(400)
-      .json({ error: "Message is already pinned in the chat" });
+    return next(new ApiError("Message is already pinned in the chat", 400));
   }
 
-  chat.pinnedMessages.push(messageId);
-  await chat.save();
+  // Update the chat document to add the message to the pinnedMessages array
+  await Chat.findByIdAndUpdate(
+    chatId,
+    { $push: { pinnedMessages: messageId } },
+    { new: true } // To return the modified document
+  );
 
-  res.status(200).json(chat);
+  // Fetch the updated chat document after pinning the message
+  const updatedChat = await Chat.findById(chatId);
+
+  res.status(200).json(updatedChat);
 });
 //@desc Unpin a message in a chat
 //@route DELETE /api/v1/chat/:chatId/unpin/:messageId
 //@access protected
-exports.unpinMessageInChat = asyncHandler(async (req, res) => {
+exports.unpinMessageInChat = asyncHandler(async (req, res, next) => {
   const { chatId, messageId } = req.params;
 
   const chat = await Chat.findById(chatId);
 
   if (!chat) {
-    return res.status(404).json({ error: "Chat not found" });
+    return next(new ApiError("Chat not found", 404));
   }
 
   // Check if the message exists in the pinned messages of the chat
   const messageIndex = chat.pinnedMessages.indexOf(messageId);
   if (messageIndex === -1) {
-    return res.status(400).json({ error: "Message is not pinned in the chat" });
+    return next(new ApiError("Message is not pinned in the chat", 400));
   }
 
-  chat.pinnedMessages.splice(messageIndex, 1);
-  await chat.save();
+  // Update the chat document to remove the message from the pinnedMessages array
+  await Chat.findByIdAndUpdate(
+    chatId,
+    { $pull: { pinnedMessages: messageId } },
+    { new: true } // To return the modified document
+  );
 
-  res.status(200).json(chat);
+  // Fetch the updated chat document after unpinning the message
+  const updatedChat = await Chat.findById(chatId);
+
+  res.status(200).json(updatedChat);
 });
 //@desc Archive a chat
 //@route PUT /api/v1/chat/:chatId/archive
 //@access protected
-exports.archiveChat = asyncHandler(async (req, res) => {
+exports.archiveChat = asyncHandler(async (req, res, next) => {
   const { chatId } = req.params;
 
-  const chat = await Chat.findById(chatId);
-
+  // Update the chat document to set the archived field to true
+  const chat = await Chat.findByIdAndUpdate(
+    chatId,
+    { $set: { archived: true } },
+    { new: true } // To return the modified document
+  );
   if (!chat) {
-    return res.status(404).json({ error: "Chat not found" });
+    return next(new ApiError("Chat not found", 404));
   }
 
-  chat.archived = true;
-  await chat.save();
-
-  res.status(200).json(chat);
+  res.status(200).json({ message: "archived" });
 });
 //@desc Unarchive a chat
 //@route PUT /api/v1/chat/:chatId/unarchive
 //@access protected
-exports.unarchiveChat = asyncHandler(async (req, res) => {
+exports.unarchiveChat = asyncHandler(async (req, res, next) => {
   const { chatId } = req.params;
 
-  const chat = await Chat.findById(chatId);
+  const chat = await Chat.findByIdAndUpdate(
+    chatId,
+    { $set: { archived: false } },
+    { new: true }
+  );
 
   if (!chat) {
-    return res.status(404).json({ error: "Chat not found" });
+    return next(new ApiError("Chat not found", 404));
   }
 
-  chat.archived = false;
-  await chat.save();
-
-  res.status(200).json(chat);
+  res.status(200).json({ message: "unarchived" });
 });
-
-//@desc Mark all messages in a chat as read
-//@route PUT /api/v1/chat/:chatId/markasread
-//@access protected
-exports.markUserMessagesAsRead = async (req, res) => {
-  const { chatId } = req.params;
-  const userId = req.user._id; // logged user id
-
-  try {
-    const unreadMessages = await Message.find({ chatId, isRead: false });
-
-    if (!unreadMessages || unreadMessages.length === 0) {
-      return res
-        .status(404)
-        .json({ error: "No unread messages found in this chat" });
-    }
-
-    const chat = await Chat.findById(chatId); // Fetch the chat details
-
-    if (!chat) {
-      return res.status(404).json({ error: "Chat not found" });
-    }
-
-    const participantIds = chat.participants.map((participant) =>
-      participant.userId._id.toString()
-    );
-    console.log("participantIds", participantIds);
-    if (chat.isGroupChat) {
-      const isParticipant = participantIds.includes(userId.toString());
-
-      if (!isParticipant) {
-        return res
-          .status(403)
-          .json({ error: "User is not a participant of this group chat" });
-      }
-
-      const userInSeenBy = unreadMessages.filter(
-        (message) =>
-          message.chatId && !message.seendBy.includes(userId.toString())
-      );
-      console.log("userInSeenBy", userInSeenBy);
-      // Check if the user already marked the messages as read
-      const userMarkedRead = userInSeenBy.every((message) =>
-        message.seendBy.includes(userId)
-      );
-      console.log("userMarkedRead", userMarkedRead);
-
-      if (userMarkedRead) {
-        return res.status(200).json({
-          message: "Unread messages in the chat marked as read",
-        });
-      }
-
-      const allParticipantsSeen = userInSeenBy.every((message) => {
-        const unseenParticipants = participantIds
-          .filter(
-            (participantId) => participantId !== message.senderId._id.toString()
-          )
-          .filter((participantId) => !message.seendBy.includes(participantId));
-        console.log("unseenParticipants", unseenParticipants);
-        return unseenParticipants.length === 0;
-      });
-
-      if (!allParticipantsSeen) {
-        await Promise.all(
-          userInSeenBy.map(async (message) => {
-            if (!message.seendBy.includes(userId)) {
-              await Message.updateOne(
-                { _id: message._id },
-                { $addToSet: { seendBy: userId } }
-              );
-
-              const unseenParticipants = participantIds
-                .filter(
-                  (participantId) =>
-                    participantId !== message.senderId._id.toString()
-                )
-                .filter(
-                  (participantId) => !message.seendBy.includes(participantId)
-                );
-
-              if (
-                unseenParticipants.length === 1 &&
-                unseenParticipants[0] === userId.toString()
-              ) {
-                // If the last unseen participant is the current user, mark the message as read
-                await Message.updateOne(
-                  { _id: message._id },
-                  { $set: { isRead: true } }
-                );
-              }
-            }
-          })
-        );
-
-        return res.status(200).json({
-          message: "Wait for all participants to read the message",
-        });
-      }
-    }
-
-    await Promise.all(
-      unreadMessages.map(async (message) => {
-        if (message.senderId._id.toString() === userId.toString()) {
-          // If sender, don't add to seendBy array or mark as read
-          return;
-        }
-
-        await Message.updateOne(
-          { _id: message._id },
-          {
-            $set: { isRead: true },
-            $addToSet: { seendBy: userId },
-          }
-        );
-      })
-    );
-
-    res
-      .status(200)
-      .json({ message: "Unread messages in the chat marked as read" });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};

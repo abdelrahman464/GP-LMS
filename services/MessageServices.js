@@ -1,14 +1,21 @@
 const asyncHandler = require("express-async-handler");
 const Message = require("../models/MessageModel");
 const Chat = require("../models/ChatModel");
+const Notification = require("../models/notificationModel");
+// const User = require("../models/userModel");
+const factory = require("./handllerFactory");
+const ApiError = require("../utils/apiError");
+
+const sendEmail = require("../utils/sendEmail");
 
 //@desc add a message to chat
 //@route POST /api/v1/message/:chatId
 //@access protected
-exports.addMessage = asyncHandler(async (req, res) => {
+exports.addMessage = asyncHandler(async (req, res, next) => {
   const { chatId } = req.params;
-  const { text } = req.body;
-  const senderId = req.user._id; // logged user id
+  const { text, media } = req.body;
+
+  const sender = req.user._id; // logged user id
 
   // Check if the logged-in user is a participant of the chat
   const chat = await Chat.findById(chatId);
@@ -19,139 +26,174 @@ exports.addMessage = asyncHandler(async (req, res) => {
 
   // Check if the logged-in user is a participant of the chat
   const participantIds = chat.participants.map((participant) =>
-    String(participant.userId._id)
+    String(participant.user._id)
   );
 
-  if (!participantIds.includes(String(senderId))) {
-    return res.status(403).json({
-      error: "Unauthorized access: You are not a participant of this chat",
+  if (!participantIds.includes(String(sender))) {
+    return next(
+      new ApiError(
+        "Unauthorized access: You are not a participant of this chat",
+        403
+      )
+    );
+  }
+
+  // send email to the receiver(s) if the last message was sent more than 6 hours ago
+  // Check the timestamp of the last message
+  const lastMessage = await Message.findOne({ chat: chatId }).sort({
+    createdAt: -1,
+  });
+
+  const delayHoursInMillis = 6 * 60 * 60 * 1000; // 6 hours in milliseconds
+  const now = new Date();
+  if (lastMessage && now - lastMessage.createdAt > delayHoursInMillis) {
+    // Find the receiver(s) in the chat (excluding the sender)
+    const receivers = chat.participants
+      .filter((participant) => String(participant.user._id) !== String(sender))
+      .map((participant) => participant.user);
+
+    // Send email to each receiver
+    receivers.forEach(async (receiver) => {
+      await sendEmail({
+        to: receiver.email,
+        subject: "New message in chat",
+        text: `You have a new message in the chat from ${req.user.username}.`,
+      });
     });
   }
 
   // Create a new message
-  const message = new Message({
-    chatId,
-    senderId,
+  const messageData = {
+    chat,
+    sender,
     text,
-  });
+  };
 
-  // Save the message
-  await message.save();
+  if (media) {
+    messageData.media = media;
+  }
 
-  res.status(200).json(message);
+  // Create a new message
+  const msg = await Message.create(messageData);
+
+  const newMessage = await Message.findById(msg._id);
+  res.status(201).json(newMessage);
 });
-
-//@desc
-//@route GET /api/v1/message
+//filter meesages from chat
+exports.createFilterObj = (req, res, next) => {
+  let filterObject = {};
+  filterObject = { chat: req.params.chatId };
+  req.filterObj = filterObject;
+  next();
+};
+//@desc get all messages in chat
+//@route GET /api/v1/message/chatId
 //@access protected
-exports.getMessage = asyncHandler(async (req, res) => {
-  const { chatId } = req.params;
-  const userId = req.user._id; // logged user id
-
-  const chat = await Chat.findById(chatId);
-
-  if (!chat) {
-    return res.status(404).json({ error: "Chat not found" });
-  }
-
-  // Check if the logged-in user is a participant of the chat
-  const participantIds = [];
-
-  chat.participants.forEach((participant) => {
-    if (participant.userId && participant.userId._id) {
-      participantIds.push(String(participant.userId._id));
-    } else {
-      return res.status(403).json({
-        error: "Unauthorized access: User ID is null",
-      });
-    }
-  });
-
-  // Assuming userId is defined earlier in your code
-  if (userId === null) {
-    return res.status(403).json({
-      error: "Unauthorized access: User ID is null",
-    });
-  }
-
-  if (participantIds.length === 0) {
-    return res.status(403).json({
-      error: "Unauthorized access: No participants found in this chat",
-    });
-  }
-
-  if (!participantIds.includes(String(userId))) {
-    return res.status(403).json({
-      error: "Unauthorized access: You are not a participant of this chat",
-    });
-  }
-
-  const messages = await Message.find({ chatId }).populate(
-    "senderId",
-    "username"
-  ); // Assuming 'senderId' is a reference to the user who sent the message
-
-  res.status(200).json(messages);
-});
-
+exports.getMessage = factory.getALl(Message, "Message", "reactions.user");
 //@desc Update a message by ID
 //@route PUT /api/v1/message/:messageId
 //@access protected
-exports.updateMessage = asyncHandler(async (req, res) => {
+exports.updateMessage = asyncHandler(async (req, res, next) => {
   const { messageId } = req.params;
   const { text, media } = req.body;
   const userId = req.user._id; // logged user id
-  console.log(messageId);
-  console.log(req.body);
+
   const message = await Message.findById(messageId);
 
   if (!message) {
-    return res.status(404).json({ error: "Message not found" });
+    return next(new ApiError("Message not found", 404));
   }
+
+  const sixHoursInMillis = 6 * 60 * 60 * 1000;
+  const now = new Date();
 
   // Check if the logged-in user is the sender of the message
-  if (String(message.senderId._id) !== String(userId)) {
-    return res
-      .status(403)
-      .json({ error: "Unauthorized access: You cannot update this message" });
+  if (String(message.sender._id) !== String(userId)) {
+    return next(
+      new ApiError("Unauthorized access: You cannot update this message", 403)
+    );
+  }
+  // user cannot update the message after 6h from he sent it unless he is an admin
+  if (now - message.createdAt > sixHoursInMillis) {
+    if (req.user.role !== "admin") {
+      return next(
+        new ApiError(
+          "Unauthorized access: You cannot update this message after 6 hours",
+          403
+        )
+      );
+    }
   }
 
-  const updatedMessage = await Message.findByIdAndUpdate(
-    messageId,
-    { text, media },
-    { new: true }
-  );
+  // Create an update object based on provided data
+  const updateData = {};
+  if (text !== undefined && text !== null) {
+    updateData.text = text;
+  }
+  if (media !== undefined && media !== null) {
+    updateData.media = media;
+  }
 
-  res.status(200).json(updatedMessage);
+  // Update the message if updateData is not empty
+  if (Object.keys(updateData).length > 0) {
+    const updatedMessage = await Message.findByIdAndUpdate(
+      messageId,
+      updateData,
+      { new: true }
+    );
+
+    res.status(200).json(updatedMessage);
+  } else {
+    // If no data is provided to update, return the unmodified message
+    res.status(200).json(message);
+  }
 });
 //@desc Delete a message by ID
 //@route DELETE /api/v1/message/:messageId
 //@access protected
-exports.deleteMessage = asyncHandler(async (req, res) => {
+
+exports.deleteMessage = asyncHandler(async (req, res, next) => {
   const { messageId } = req.params;
   const userId = req.user._id; // logged user id
 
   const message = await Message.findById(messageId);
 
   if (!message) {
-    return res.status(404).json({ error: "Message not found" });
+    return next(new ApiError("Message not found", 404));
   }
 
-  // Check if the logged-in user is the sender of the message
-  if (String(message.senderId._id) !== String(userId)) {
-    return res
-      .status(403)
-      .json({ error: "Unauthorized access: You cannot delete this message" });
+  const sixHoursInMillis = 6 * 60 * 60 * 1000;
+  const now = new Date();
+
+  // Check if the logged-in user is the sender of the message or an admin
+  if (String(message.sender._id) !== String(userId)) {
+    if (req.user.role !== "admin") {
+      return next(
+        new ApiError("Unauthorized access: You cannot delete this message", 403)
+      );
+    }
+    // If the user is an admin, allow deletion of any message regardless of the time it was sent
+    // user cannot delete the message after 6h from he sent it unless he is an admin
+  } else if (now - message.createdAt > sixHoursInMillis) {
+    if (req.user.role !== "admin") {
+      return next(
+        new ApiError(
+          "Unauthorized access: You cannot delete this message after 6 hours",
+          403
+        )
+      );
+    }
   }
 
   await Message.findByIdAndDelete(messageId);
 
   res.status(200).json({ message: "Message deleted successfully" });
 });
+
 //@desc Add a reaction to a message
 //@route POST /api/v1/message/:messageId/reactions
 //@access protected
-exports.toggleReactionToMessage = asyncHandler(async (req, res) => {
+exports.toggleReactionToMessage = asyncHandler(async (req, res, next) => {
   const { messageId } = req.params;
   const { emoji } = req.body;
   const userId = req.user._id; // logged user id
@@ -159,56 +201,93 @@ exports.toggleReactionToMessage = asyncHandler(async (req, res) => {
   const message = await Message.findById(messageId);
 
   if (!message) {
-    return res.status(404).json({ error: "Message not found" });
+    return next(new ApiError("Message not found", 404));
   }
 
   // Check if the user has already reacted to this message
   const existingReactionIndex = message.reactions.findIndex(
-    (reaction) => String(reaction.userId) === String(userId)
+    (reaction) => String(reaction.user) === String(userId)
   );
 
   if (existingReactionIndex !== -1) {
     const existingReaction = message.reactions[existingReactionIndex];
     if (existingReaction.emoji === emoji) {
       // If the new reaction is the same as the existing one, remove the reaction
-      message.reactions.splice(existingReactionIndex, 1);
+      await Message.findByIdAndUpdate(
+        messageId,
+        { $pull: { reactions: { user: userId } } },
+        { new: true }
+      );
     } else {
       // If the new reaction is different, update the existing reaction
-      existingReaction.emoji = emoji;
+      await Message.updateOne(
+        { _id: messageId, "reactions.user": userId },
+        { $set: { "reactions.$.emoji": emoji } },
+        { new: true }
+      );
     }
   } else {
     // If the user has not reacted, add the reaction
-    message.reactions.push({ userId, emoji });
+    await Message.findByIdAndUpdate(
+      messageId,
+      { $push: { reactions: { user: userId, emoji: emoji } } },
+      { new: true }
+    );
   }
 
-  await message.save();
+  // Fetch the updated message after toggling the reaction
+  const updatedMessage = await Message.findById(messageId);
 
-  res.status(200).json(message);
+  res.status(200).json({ data: updatedMessage });
 });
 
 //@desc Reply to a message
 //@route POST /api/v1/message/:messageId/reply
 //@access protected
-exports.replyToMessage = asyncHandler(async (req, res) => {
+exports.replyToMessage = asyncHandler(async (req, res, next) => {
   const { messageId } = req.params;
-  const { text } = req.body;
-  const senderId = req.user._id; // logged user id
+  const { text, media } = req.body;
+  const sender = req.user._id; // logged user id
 
   const repliedMessage = await Message.findById(messageId);
 
   if (!repliedMessage) {
-    return res.status(404).json({ error: "Message not found" });
+    return next(new ApiError("Message not found", 404));
   }
 
-  const replyMessage = new Message({
-    chatId: repliedMessage.chatId,
-    senderId,
+  // Prepare reply message data
+  const replyData = {
+    chat: repliedMessage.chat,
+    sender,
     text,
     repliedTo: repliedMessage._id,
-  });
+  };
 
-  const result = await replyMessage.save();
-  res.status(200).json(result);
+  // Include media if provided
+  if (media) {
+    replyData.media = media;
+  }
+
+  // Create reply message
+  const replyMessage = await Message.create(replyData);
+
+  // Check if the sender of the replied message is not the same as the sender of the reply
+  if (repliedMessage.sender._id.toString() !== sender.toString()) {
+    const notificationMessage = `
+    \n You have a new reply to your message.
+    \n\n Message: ${text} 
+    \n\nClick here to view the message: https://nexgen-academy.com/en/chat/${repliedMessage.chat}`;
+
+    await Notification.create({
+      user: sender._id,
+      message: notificationMessage,
+      chat: repliedMessage.chat,
+      type: "chat",
+    });
+  }
+  const message = await Message.findById(replyMessage._id);
+
+  res.status(200).json({ data: message });
 });
 //@desc Get replies to a message
 //@route GET /api/v1/message/:messageId/replies
@@ -218,69 +297,5 @@ exports.getRepliesToMessage = asyncHandler(async (req, res) => {
 
   const replies = await Message.find({ repliedTo: messageId });
 
-  res.status(200).json(replies);
-});
-//@desc Forward a message to another chat
-//@route POST /api/v1/message/:messageId/forward/:chatId
-//@access protected
-exports.forwardMessage = asyncHandler(async (req, res) => {
-  const { messageId, chatId } = req.params;
-  const senderId = req.user._id; // logged user id
-
-  const messageToForward = await Message.findById(messageId);
-
-  if (!messageToForward) {
-    return res.status(404).json({ error: "Message not found" });
-  }
-
-  const forwardedMessage = new Message({
-    chatId,
-    senderId,
-    text: messageToForward.text,
-    media: messageToForward.media,
-    forwardedFrom: messageToForward.senderId,
-  });
-
-  const result = await forwardedMessage.save();
-  res.status(200).json(result);
-});
-//@desc Get messages forwarded by a user
-//@route GET /api/v1/message/forwarded
-//@access protected
-exports.getForwardedMessages = asyncHandler(async (req, res) => {
-  const userId = req.user._id; // logged user id
-
-  const forwardedMessages = await Message.find({ forwardedFrom: userId });
-
-  res.status(200).json(forwardedMessages);
-});
-
-//@desc  get count of unread messages for a chat ID
-//@route GET /api/v1/unread/:chatId
-//@access protected private
-exports.countUnreadMessages = asyncHandler(async (req, res) => {
-  const { chatId } = req.params;
-  const userId = req.user._id; // logged user id
-
-  const unreadMessagesCount = await Message.countDocuments({
-    chatId,
-    isRead: false,
-    seendBy: { $ne: userId },// Exclude messages seen by the user
-    senderId: { $ne: userId }, // Exclude messages seen by the logged-in user
-  });
-  
-  res.status(200).json({ unreadMessagesCount });
-});
-//@desc  get count of unread messages for a user
-//@route GET /api/v1/unread/user
-//@access protected private
-exports.countUnreadMessagesForUser = asyncHandler(async (req, res) => {
-  const userId = req.user._id;
-  const unreadMessagesCount = await Message.countDocuments({
-    senderId: { $ne: userId }, // Messages not sent by the user
-    isRead: false,
-    seendBy: { $nin: [userId] }, // User ID not in the 'seenBy' array
-  });
-
-  res.status(200).json({ unreadMessagesCount });
+  res.status(200).json({ data: replies });
 });

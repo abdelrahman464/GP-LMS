@@ -2,10 +2,7 @@ const express = require("express");
 const {
   createChat,
   findChat,
-  getMyChats,
   createGroupChat,
-  // getLoggedUserGroupChats,
-  // getLoggedUserChats,
   addParticipantToChat,
   removeParticipantFromChat,
   updateParticipantRoleInChat,
@@ -16,24 +13,28 @@ const {
   unpinMessageInChat,
   archiveChat,
   unarchiveChat,
-  markUserMessagesAsRead
+  getMyChats,
 } = require("../services/ChatServices");
 const authServices = require("../services/authServices");
 
 const router = express.Router();
-router.post("/group", authServices.protect, createGroupChat);
+router.post(
+  "/:receiverId",
+  authServices.protect,
+  authServices.allowedTo("admin"),
+  createChat
+);
 
-router.post("/:receiverId", authServices.protect, createChat);
+router.post(
+  "/",
+  authServices.protect,
+  authServices.allowedTo("admin"),
+  createGroupChat
+);
 
 router.get("/myChats", authServices.protect, getMyChats);
 router.get("/find/:secondPersonId", authServices.protect, findChat);
 
-// router.get(
-//   "/loggedUserGroupChats",
-//   authServices.protect,
-//   getLoggedUserGroupChats
-// );
-// router.get("/loggedUserChats", authServices.protect, getLoggedUserChats);
 router.put(
   "/:chatId/addParticipant",
   authServices.protect,
@@ -50,7 +51,11 @@ router.put(
   updateParticipantRoleInChat
 );
 router.get("/:chatId/details", authServices.protect, getChatDetails);
-router.put("/:chatId/updateGroup", authServices.protect, updateGrpupChat);
+router.put(
+  "/:chatId/updateGroup",
+  authServices.protect,
+  updateGrpupChat
+);
 router.delete("/:chatId", authServices.protect, deleteChat);
 router.post("/:chatId/pin/:messageId", authServices.protect, pinMessageInChat);
 router.delete(
@@ -60,6 +65,5 @@ router.delete(
 );
 router.put("/:chatId/archive", authServices.protect, archiveChat);
 router.put("/:chatId/unarchive", authServices.protect, unarchiveChat);
-router.put("/:chatId/markasread", authServices.protect, markUserMessagesAsRead);
 
 module.exports = router;
