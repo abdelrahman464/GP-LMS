@@ -1,5 +1,5 @@
-/* eslint-disable import/no-extraneous-dependencies */
 const stripe = require("stripe")(process.env.STRIPE_SECRET);
+const mongoose = require("mongoose");
 const asyncHandler = require("express-async-handler");
 const ApiError = require("../utils/apiError");
 const factory = require("./handllerFactory");
@@ -7,8 +7,9 @@ const Order = require("../models/orderModel");
 const Course = require("../models/courseModel");
 const User = require("../models/userModel");
 const Coupon = require("../models/couponModel");
+const Notification = require("../models/notificationModel");
+const Chat = require("../models/ChatModel");
 
-// const{calculateProfits}=require('../marketing/marketingService')
 
 exports.filterOrderForLoggedUser = asyncHandler(async (req, res, next) => {
   if (req.user.role === "user") req.filterObj = { user: req.user._id };
@@ -48,7 +49,7 @@ exports.checkoutSession = asyncHandler(async (req, res, next) => {
       expire: { $gt: Date.now() },
     });
     if (!coupon) {
-      return next(new ApiError("Coupon is Invalid or Expired "));
+      return next(new ApiError("Coupon is Invalid or Expired"));
     }
     metadataObject.coupon = req.body.coupon;
 
@@ -67,15 +68,15 @@ exports.checkoutSession = asyncHandler(async (req, res, next) => {
           unit_amount: totalOrderPrice * 100,
           currency: "usd",
           product_data: {
-            name: req.user.name,
+            name: req.user.username,
           },
         },
         quantity: 1,
       },
     ],
     mode: "payment",
-    success_url: `/profile`,
-    cancel_url: `/`,
+    success_url: 'https://yourdomain.com/profile', // Replace with your actual success URL
+    cancel_url: 'https://yourdomain.com/', // Replace with your actual cancel URL
     customer_email: req.user.email,
 
     client_reference_id: req.params.courseId, // i will use to create order
@@ -85,22 +86,57 @@ exports.checkoutSession = asyncHandler(async (req, res, next) => {
   //4) send session to response
   res.status(200).json({ status: "success", session });
 });
+
 //*-------------------------------------------------------------------------------------- */
+async function giveUserCourse(user, course) {
+  // Ensure user._id is an ObjectId
+  const userId = mongoose.Types.ObjectId(user._id);
+
+  // Add user to course
+  await Course.findByIdAndUpdate(
+    course._id,
+    {
+      $push: {
+        users: userId, // Push the ObjectId directly
+      },
+    },
+    { new: true }
+  );
+
+  // Add user to group chat
+  const chat = await Chat.findOneAndUpdate(
+    { course: course._id, isGroupChat: true },
+    { $push: { participants: { user: userId, isAdmin: false } } }, // Adjust if participants field needs a specific structure
+    { new: true }
+  );
+
+  // Send notification
+  await Notification.create({
+    user: userId,
+    message: `You have been added to the group ${chat.groupName}`,
+    chat: chat._id,
+    type: "chat",
+  });
+}
+
 const createOrder = async (session) => {
   const courseId = session.client_reference_id;
   const orderPrice = session.amount_total / 100;
-  //1)retrieve importsant objects
+
+  // Retrieve important objects
   const course = await Course.findById(courseId);
   const user = await User.findOne({ email: session.customer_email });
+
   if (!course) {
-    return new Error("course Not Found");
+    throw new Error("Course Not Found");
   }
   if (!user) {
-    return new Error(" User Not Found");
+    throw new Error("User Not Found");
   }
 
   const coupon = session.metadata.coupon || "no coupon used";
-  //2)create order with default payment method cash
+
+  // Create order with default payment method cash
   const order = await Order.create({
     user: user._id,
     totalOrderPrice: orderPrice,
@@ -111,18 +147,15 @@ const createOrder = async (session) => {
   });
 
   if (!order) {
-    return new Error("Couldn't Create Order");
+    throw new Error("Couldn't Create Order");
   }
 
-  // 2)Add the user object to the users array in the course
-  course.users.addToSet(user._id);
-  await course.save();
+  // Add course to user courses and joined him to chat and send notification to him
+  await giveUserCourse(user, course);
+  return true;
 };
-//-----------------------------------------------------------------------
 
-//@desc this webhook will run when the stripe payment success paied
-//@route POST /webhook-checkout
-//@access protected/user
+// Webhook route setup
 exports.webhookCheckout = asyncHandler(async (req, res) => {
   const sig = req.headers["stripe-signature"];
 
@@ -130,7 +163,7 @@ exports.webhookCheckout = asyncHandler(async (req, res) => {
 
   try {
     event = stripe.webhooks.constructEvent(
-      req.rawBody,
+      req.body,
       sig,
       process.env.STRIPE_WEBHOOK_SECRET
     );

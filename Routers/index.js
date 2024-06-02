@@ -1,8 +1,8 @@
 const userRoute = require("./UserRoute");
 const authRoute = require("./AuthRoute");
-const chatRoute = require("./ChatRoute");
+const ChatRoute = require("./ChatRoute");
 const MessageRoute = require("./MessageRoute");
-const NotificationRoute = require("./notificationRoute");
+const notificationRoute = require("./notificationRoute");
 
 const PostRoute = require("./postRoute");
 const PostCommentRoute = require("./postCommentRoute");
@@ -22,9 +22,6 @@ const mountRoutes = (app) => {
   // Mount Routes
   app.use("/api/v1/users", userRoute);
   app.use("/api/v1/auth", authRoute);
-  app.use("/api/v1/chat", chatRoute);
-  app.use("/api/v1/message", MessageRoute);
-  app.use("/api/v1/notification", NotificationRoute);
 
   app.use("/api/v1/coupons", CouponRoute);
   app.use("/api/v1/reviews", ReviewRoute);
@@ -39,5 +36,10 @@ const mountRoutes = (app) => {
   app.use("/api/v1/postReacts", PostReactRoute);
 
   app.use("/api/v1/instructorsReqs", InstructorRoute);
+
+  app.use("/api/v1/chats", ChatRoute);
+  app.use("/api/v1/messages", MessageRoute);
+  app.use("/api/v1/notifications", notificationRoute);
+
 };
 module.exports = mountRoutes;

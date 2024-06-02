@@ -2,6 +2,7 @@ const asyncHandler = require("express-async-handler");
 const sharp = require("sharp");
 const { v4: uuidv4 } = require("uuid");
 const Course = require("../models/courseModel");
+const Chat = require("../models/ChatModel");
 const User = require("../models/userModel");
 const factory = require("./handllerFactory");
 const { uploadSingleImage } = require("../middlewares/uploadImageMiddleware");
@@ -44,6 +45,7 @@ exports.createFilterObj = (req, res, next) => {
 exports.createFilterObjToGetMyCourses = async (req, res, next) => {
   let filterObject = {};
   if (req.user.role === "user") {
+    console.log("user",req.user._id);
     filterObject = { users: { $in: [req.user._id] } };
   } else if (req.user.role === "instructor") {
     filterObject = { instructor: req.user._id };
@@ -52,8 +54,33 @@ exports.createFilterObjToGetMyCourses = async (req, res, next) => {
   next();
 };
 // Create a new course
-exports.createCourse = factory.createOne(Course);
+exports.createCourse = asyncHandler(async (req, res) => {
+  //create the course
+  const course = await Course.create(req.body);
+  //if course created then create the group chat
+  if (course) {
+    const { description, title } = req.body;
+    const groupCreatorId = req.user._id.toString();
+    const groupAdminId = req.body.instructor.toString();
 
+    const groupNameAsCourse = `Group For Course: ${title}`;
+    const groupDescriptionAsCourse = `This group is for the course: ${title} - ${description}`;
+
+    // Create the new group chat
+    await Chat.create({
+      participants: [
+        { user: groupCreatorId, isAdmin: true },
+        { user: groupAdminId, isAdmin: true },
+      ],
+      isGroupChat: true,
+      course: course._id,
+      creator: req.user._id,
+      groupName: groupNameAsCourse,
+      description: groupDescriptionAsCourse,
+    });
+  }
+  res.status(201).json({ data: course });
+});
 // Get all courses
 exports.getAllCourses = factory.getALl(Course);
 

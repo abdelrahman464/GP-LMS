@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const Section = require("./sectionModel");
 const Post = require("./postModel");
+const Chat = require("./ChatModel");
 
 const courseSchema = new mongoose.Schema(
   {
@@ -123,6 +124,12 @@ courseSchema.pre("remove", async function () {
       await post.remove({ session });
     }
 
+    // Find and delete related chats (cascade to messages)
+    const chats = await Chat.find({ course: this._id }).session(session);
+    for (let chat of chats) {
+      await chat.remove({ session });
+    }
+
     await session.commitTransaction();
   } catch (error) {
     await session.abortTransaction();
@@ -130,8 +137,6 @@ courseSchema.pre("remove", async function () {
   } finally {
     session.endSession();
   }
-
- 
 });
 
 const Course = mongoose.model("Course", courseSchema);

@@ -54,8 +54,9 @@ app.use(passport.initialize());
 //checkout webhook
 // we will use to buy courses
 app.post(
-  "/webhook-checkout",
-  express.raw({ type: "application/json" }),
+
+    "/webhook-checkout",
+    express.raw({ type: "application/json" }),
   webhookCheckout
 );
 

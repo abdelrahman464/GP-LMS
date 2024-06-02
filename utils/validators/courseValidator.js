@@ -67,7 +67,6 @@ exports.createCourseValidator = [
     .custom((instructorId) =>
       User.find({ _id: instructorId, role: "instructor" }).then(
         (instructor) => {
-          console.log(instructor);
           if (instructor.length === 0) {
             return Promise.reject(
               new ApiError(

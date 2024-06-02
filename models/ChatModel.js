@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const Message = require("./MessageModel");
 
 const chatSchema = new mongoose.Schema(
   {
@@ -55,7 +56,7 @@ chatSchema.pre(/^find/, function (next) {
     .populate({ path: "pinnedMessages", select: "text" })
     .populate({
       path: "course",
-      select: "title -accessibleCourses -category",
+      select: "title  -category",
     });
   next();
 });
@@ -77,5 +78,23 @@ chatSchema.post("init", (doc) => {
 chatSchema.post("save", (doc) => {
   setImageURL(doc);
 });
+
+chatSchema.pre("remove", async function () {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    // Find and delete related messages
+    await Message.find({ chat: this._id }).session(session);
+
+    await session.commitTransaction();
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
+  }
+});
+
 const Chat = mongoose.model("Chat", chatSchema);
 module.exports = Chat;
