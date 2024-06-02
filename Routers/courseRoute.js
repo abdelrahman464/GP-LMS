@@ -46,8 +46,6 @@ router.post(
 // Get all courses
 router.get(
   "/",
-  authServices.protect,
-  authServices.allowedTo("instructor", "admin", "user"),
   createFilterObj,
   getAllCourses
 );
@@ -62,15 +60,12 @@ router.get(
 // Get a specific course by ID
 router.get(
   "/:id",
-  authServices.protect,
-  authServices.allowedTo("instructor", "admin", "user"),
   checkCourseIdParamValidator,
   getCourseById
 );
 //Get course with CategoryId  gomaa
 router.get(
   "/relatedCourses/:catId",
-  authServices.protect,
   getRelatedCoursesValidator,
   relatedCourses
 );
