@@ -42,10 +42,10 @@ exports.createFilterObj = (req, res, next) => {
   next();
 };
 //filter to get my courses as admin , instractor , user
-exports.createFilterObjToGetMyCourses = async (req, res, next) => {
+exports.filterMyCoursesBasedOnRole = async (req, res, next) => {
   let filterObject = {};
   if (req.user.role === "user") {
-    console.log("user",req.user._id);
+    console.log("user", req.user._id);
     filterObject = { users: { $in: [req.user._id] } };
   } else if (req.user.role === "instructor") {
     filterObject = { instructor: req.user._id };
@@ -82,10 +82,20 @@ exports.createCourse = asyncHandler(async (req, res) => {
   res.status(201).json({ data: course });
 });
 // Get all courses
-exports.getAllCourses = factory.getALl(Course);
+exports.getAllCourses = async (req, res, next) => {
+  const courses = await Course.find(req.filterObj).select("-users -__v");
+  if (!courses) return next(new ApiError(`no courses found`, 404));
+  return res.status(200).json({ role: req.user.role, data: courses });
+};
 
 // Get a specific course by ID
-exports.getCourseById = factory.getOne(Course, "reviews");
+exports.getCourseById = asyncHandler(async (req, res) => {
+  const course = await Course.findById(req.params.id)
+    .populate("reviews")
+    .select("-users -__v");
+  if (!course) return next(new ApiError(`no course found`, 404));
+  return res.status(200).json({ data: course });
+});
 
 // Update a course by ID
 exports.updateCourse = factory.updateOne(Course);
@@ -96,7 +106,7 @@ exports.deleteCourse = factory.deleteOne(Course);
 exports.relatedCourses = asyncHandler(async (req, res) => {
   const { catId } = req.params;
   const courses = await Course.find({ category: catId });
-  res.status(200).json({ data: courses });
+  return res.status(200).json({ data: courses });
 });
 // to be done when user purchase a course
 exports.addUserToCourse = asyncHandler(async (req, res, next) => {
@@ -129,17 +139,24 @@ exports.addUserToCourse = asyncHandler(async (req, res, next) => {
 //@desc get course users
 //@route Get courses/courseUsers
 //@access protected user
-exports.getCourseUsers = asyncHandler(async (req, res, next) => {
-  const { courseId } = req.body;
-  const course = await Course.findById(courseId);
+exports.getCourseSubscripers = asyncHandler(async (req, res, next) => {
+  const { id } = req.params;
+  const course = await Course.findById(id);
   if (!course) {
     return next(new ApiError(`no course for that id`, 400));
   }
   const usersInCourse = course.users.map((user) => user.toString());
-  const users = await User.find({ _id: { $in: usersInCourse } });
-  if (!users) return next(new ApiError(`no users in this course`, 400));
+  const subscripedUsers = await User.find({
+    _id: { $in: usersInCourse },
+  }).select("_id username email");
+  if (subscripedUsers.length === 0)
+    return next(new ApiError(`no users in this course`, 400));
 
-  return res.status(200).json({ status: "success", usersInCourse });
+  return res.status(200).json({
+    status: "success",
+    numberOfSubscripers: subscripedUsers.length,
+    subscripedUsers,
+  });
 });
 
 exports.checkCourseAuthority = (req, res, next) =>
@@ -164,24 +181,3 @@ exports.checkCourseAuthority = (req, res, next) =>
     // res.json(package)
     next();
   });
-
-//@desc get instrucor course
-//@route Get courses/instructorCourses/:instrucorId
-//@access protected user
-exports.getInstructorCourses = asyncHandler(async (req, res, next) => {
-  const { instrucorId } = req.body;
-  const user = await User.findOne({ _id: instrucorId, role: "instructor" });
-  if (!user) {
-    return next(
-      new ApiError(
-        `the instructor you have entered must have role instructor`,
-        403
-      )
-    );
-  }
-  const courses = await Course.find({ instructor: instrucorId });
-  if (!courses) {
-    return next(new ApiError(`no courses for this instructor`, 404));
-  }
-  return res.status(200).json({ status: "success", courses });
-});
