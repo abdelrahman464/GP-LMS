@@ -10,7 +10,6 @@ const {
 const {
   uploadCourseImage,
   resizeImage,
-  createFilterObj,
   filterMyCoursesBasedOnRole,
   createCourse,
   setinstructorIdToBody,
@@ -43,7 +42,7 @@ router.post(
 );
 
 // Get all courses
-router.get("/", createFilterObj, getAllCourses);
+router.get("/", getAllCourses);
 router.get(
   "/MyCourses",
   authServices.protect,

@@ -34,13 +34,6 @@ exports.setinstructorIdToBody = (req, res, next) => {
   next();
 };
 
-//filter subCategories in specefic category by categoryId
-exports.createFilterObj = (req, res, next) => {
-  let filterObject = {};
-  if (req.params.categoryId) filterObject = { category: req.params.categoryId };
-  req.filterObj = filterObject;
-  next();
-};
 //filter to get my courses as admin , instractor , user
 exports.filterMyCoursesBasedOnRole = async (req, res, next) => {
   let filterObject = {};
@@ -85,7 +78,7 @@ exports.createCourse = asyncHandler(async (req, res) => {
 exports.getAllCourses = async (req, res, next) => {
   const courses = await Course.find(req.filterObj).select("-users -__v");
   if (!courses) return next(new ApiError(`no courses found`, 404));
-  return res.status(200).json({ role: req.user.role, data: courses });
+  return res.status(200).json({ data: courses });
 };
 
 // Get a specific course by ID
