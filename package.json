@@ -10,6 +10,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "axios": "^1.7.2",
     "bcryptjs": "^2.4.3",
     "colors": "^1.4.0",
     "compression": "^1.7.4",
@@ -32,11 +33,11 @@
     "passport-google-oauth20": "^2.0.0",
     "path": "^0.12.7",
     "sharp": "^0.29.3",
-    "slugify": "^1.6.3",
-    "stripe": "^8.222.0",
-    "uuid": "^8.3.2",
     "simple-peer": "^9.11.1",
-    "socket.io": "^2.3.0"
+    "slugify": "^1.6.3",
+    "socket.io": "^2.3.0",
+    "stripe": "^8.222.0",
+    "uuid": "^8.3.2"
   },
   "devDependencies": {
     "eslint": "^8.36.0",
