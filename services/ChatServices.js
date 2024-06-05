@@ -56,6 +56,7 @@ exports.createChat = asyncHandler(async (req, res, next) => {
         { "participants.user": senderId },
         { "participants.user": receiverId },
       ],
+      isGroupChat: false,
     });
 
     if (existingChat) {
