@@ -1,5 +1,7 @@
 const express = require("express");
-
+const {
+  getMessageValidator,
+} = require("../utils/validators/messagesValidator");
 const {
   replyToMessage,
   getRepliesToMessage,
@@ -15,7 +17,13 @@ const authServices = require("../services/authServices");
 const router = express.Router();
 
 router.post("/:chatId", authServices.protect, addMessage);
-router.get("/:chatId", authServices.protect, createFilterObj, getMessage);
+router.get(
+  "/:chatId",
+  authServices.protect,
+  getMessageValidator,
+  createFilterObj,
+  getMessage
+);
 
 router.put("/:messageId", authServices.protect, updateMessage);
 router.post("/:messageId/reply", authServices.protect, replyToMessage);

@@ -1,10 +1,47 @@
 const asyncHandler = require("express-async-handler");
+const sharp = require("sharp");
+const { v4: uuidv4 } = require("uuid");
 const mongoose = require("mongoose");
 const Chat = require("../models/ChatModel");
 const Message = require("../models/MessageModel");
 const Notification = require("../models/notificationModel");
 const ApiError = require("../utils/apiError");
+const { uploadSingleFile } = require("../middlewares/uploadImageMiddleware");
 
+//upload Singel image
+exports.uploadImage = uploadSingleFile("image");
+//image processing
+exports.resizeImage = asyncHandler(async (req, res, next) => {
+  const { file } = req; // Access the uploaded file
+  if (file) {
+    const fileExtension = file.originalname.substring(
+      file.originalname.lastIndexOf(".")
+    ); // Extract file extension
+    const newFileName = `GroupImage-${uuidv4()}-${Date.now()}${fileExtension}`; // Generate new file name
+
+    // Check if the file is an image for the profile picture
+    if (file.mimetype.startsWith("image/")) {
+      // Process and save the image file using sharp for resizing, conversion, etc.
+      const filePath = `uploads/chats/${newFileName}`;
+
+      await sharp(file.buffer)
+        .toFormat("webp") // Convert to WebP
+        .webp({ quality: 97 })
+        .toFile(filePath);
+
+      // Update the req.body to include the path for the new profile image
+      req.body.image = newFileName;
+    } else {
+      return next(
+        new ApiError(
+          "Unsupported file type. Only images are allowed for Group Iamge.",
+          400
+        )
+      );
+    }
+  }
+  next();
+});
 //@desc create a chat room between 2 users
 //@route POST /api/v1/chat/:receiverId
 //@access protected
@@ -39,7 +76,7 @@ exports.createChat = asyncHandler(async (req, res, next) => {
     // Create a notification for the receiver
     await Notification.create({
       user: receiverId,
-      message: `${req.user.username} has started a chat with you`,
+      message: `${req.user.name} has started a chat with you`,
       chat: newChat._id,
       type: "chat",
     });
@@ -142,12 +179,22 @@ exports.getMyChats = async (req, res, next) => {
         },
       },
       { $sort: { "lastMessage.createdAt": -1 } },
-
+      {
+        $addFields: {
+          image: {
+            $cond: {
+              if: "$image",
+              then: { $concat: [baseUrl, "/chats/", "$image"] }, // Adjust the path as necessary
+              else: null,
+            },
+          },
+        },
+      },
       {
         $project: {
           participants: 1,
           isGroupChat: 1,
-
+          image: 1,
           groupName: 1,
           description: 1,
           archived: 1,
@@ -175,7 +222,7 @@ exports.getMyChats = async (req, res, next) => {
 //@route POST /api/v1/chat/group
 //@access protected
 exports.createGroupChat = asyncHandler(async (req, res, next) => {
-  const { participantIds, groupName, description } = req.body;
+  const { participantIds = [], groupName, description, image } = req.body;
 
   const groupCreatorId = req.user._id.toString();
 
@@ -194,14 +241,21 @@ exports.createGroupChat = asyncHandler(async (req, res, next) => {
     creator: req.user._id,
     groupName,
     description,
+    image, // Added image to the creation
+  });
+
+  res.status(201).json({
+    success: true,
+    data: newGroupChat,
   });
 
   // Send notification to all participants (except the creator)
   const notifications = filteredParticipantIds.map(async (participant) => {
     await Notification.create({
       user: participant.user,
-      message: `${req.user.username} has added you to a group chat`,
+      message: `${req.user.name} has added you to a group chat`,
       chat: newGroupChat._id,
+      image,
       type: "chat",
     });
   });
@@ -211,6 +265,45 @@ exports.createGroupChat = asyncHandler(async (req, res, next) => {
   res.status(201).json({ data: newGroupChat });
 });
 //-------------------------------------------------------------------------------------------------------------------------------------------------------
+//@desc create a group chat for marketer and his team
+//@access internal-use ,
+//@time to trigger : when a marketer become marketer
+exports.createMarketerGroupChat = asyncHandler(async (marketer) => {
+  const groupCreatorId = marketer._id.toString();
+
+  // Create the new group chat
+  await Chat.create({
+    type: "marketingTeam",
+    participants: [{ user: groupCreatorId, isAdmin: true }],
+    isGroupChat: true,
+    creator: marketer._id,
+    groupName: `${marketer.name} Group`,
+    description: `Group for ${marketer.name} , where he can communicate with his team`,
+  });
+
+  return true;
+});
+//@desc Add a participant to his marketer chat
+//@access internal-use ,
+//@time to trigger : when a new user is created and have a marketer
+exports.addMemberToChat = asyncHandler(async (user, marketer) => {
+  // Update the chat document to add the new participant with their role
+  const thisChat = await Chat.findOneAndUpdate(
+    { creator: marketer, type: "marketingTeam" },
+    { $push: { participants: { user } } },
+    { new: true }
+  );
+
+  if (thisChat) {
+    await Notification.create({
+      user: user,
+      message: `you have been to a group chat with your marketer`,
+      chat: thisChat._id,
+      type: "chat",
+    });
+  }
+  return true;
+});
 //--------------------------------------------------------------------------------------------------------------------------------------------------------
 //@desc Add a participant to a chat with a role
 //@route PUT /api/v1/chat/:chatId/addParticipant
@@ -225,7 +318,9 @@ exports.addParticipantToChat = asyncHandler(async (req, res, next) => {
   if (!chat) {
     return next(new ApiError("Chat not found", 404));
   }
-
+  if (chat.isGroupChat === false) {
+    return next(new ApiError("This is not a group chat", 400));
+  }
   // Find the logged-in user in the chat to verify admin privileges
   const loggedUser = chat.participants.find(
     (participant_) => String(participant_.user._id) === String(loggedUserId)
@@ -256,7 +351,7 @@ exports.addParticipantToChat = asyncHandler(async (req, res, next) => {
   if (thisChat) {
     await Notification.create({
       user: user,
-      message: `${req.user.username} has added you to a group chat`,
+      message: `${req.user.name} has added you to a group chat`,
       chat: thisChat._id,
       type: "chat",
     });
@@ -307,7 +402,7 @@ exports.removeParticipantFromChat = asyncHandler(async (req, res, next) => {
   if (thisChat) {
     await Notification.create({
       user: user,
-      message: `${req.user.username} has added you to a group chat`,
+      message: `${req.user.name} has added you to a group chat`,
       chat: thisChat._id,
       type: "chat",
     });
@@ -366,7 +461,7 @@ exports.updateParticipantRoleInChat = asyncHandler(async (req, res, next) => {
   if (thisChat) {
     await Notification.create({
       user: user,
-      message: `${req.user.username} has updated your role in a group chat to ${
+      message: `${req.user.name} has updated your role in a group chat to ${
         isAdmin ? "admin" : "participant"
       }`,
       chat: thisChat._id,
@@ -387,7 +482,7 @@ exports.getChatDetails = asyncHandler(async (req, res, next) => {
   const chat = await Chat.findById(chatId).populate({
     path: "participants.user",
     select:
-      "_id username email password isOAuthUser role active createdAt updatedAt __v profileImg",
+      "_id name email password isOAuthUser role active createdAt updatedAt __v profileImg",
   });
 
   if (!chat) {
@@ -399,7 +494,7 @@ exports.getChatDetails = asyncHandler(async (req, res, next) => {
 
   // Transform the participants structure to include userDetails
   const transformedParticipants = chat.participants.map((participant) => ({
-    user: participant.user._id,
+    user: participant.user,
     isAdmin: participant.isAdmin,
     _id: participant._id,
     userDetails: participant.user,
@@ -409,6 +504,7 @@ exports.getChatDetails = asyncHandler(async (req, res, next) => {
     _id: chat._id,
     participants: transformedParticipants,
     isGroupChat: chat.isGroupChat,
+    image: chat.image,
   };
 
   res.status(200).json({ data: transformedChat, mediaUrls });
@@ -419,7 +515,7 @@ exports.getChatDetails = asyncHandler(async (req, res, next) => {
 //@access protected
 exports.updateGrpupChat = asyncHandler(async (req, res, next) => {
   const { chatId } = req.params;
-  const { groupName, description } = req.body;
+  const { groupName, description, image } = req.body;
   const user = req.user._id; // logged user id
 
   // Check if the logged-in user is an admin in the group
@@ -427,6 +523,7 @@ exports.updateGrpupChat = asyncHandler(async (req, res, next) => {
     _id: chatId,
     "participants.user": user,
     "participants.isAdmin": true,
+    isGroupChat: true,
   });
 
   if (!chat) {
@@ -437,7 +534,7 @@ exports.updateGrpupChat = asyncHandler(async (req, res, next) => {
 
   const updatedChat = await Chat.findByIdAndUpdate(
     chatId,
-    { groupName, description },
+    { groupName, description, image },
     { new: true, runValidators: true }
   );
 

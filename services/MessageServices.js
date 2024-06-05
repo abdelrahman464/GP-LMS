@@ -1,13 +1,73 @@
 const asyncHandler = require("express-async-handler");
+const fs = require("fs/promises");
+const path = require("path");
+const { v4: uuidv4 } = require("uuid");
 const Message = require("../models/MessageModel");
 const Chat = require("../models/ChatModel");
 const Notification = require("../models/notificationModel");
 // const User = require("../models/userModel");
 const factory = require("./handllerFactory");
 const ApiError = require("../utils/apiError");
-
+// const sendEmail = require("../utils/sendEmail");
+const { uploadMixOfFiles } = require("../middlewares/uploadImageMiddleware");
 const sendEmail = require("../utils/sendEmail");
 
+exports.uploadMedia = uploadMixOfFiles([
+  {
+    name: "media",
+    maxCount: 15,
+  },
+]);
+
+exports.resiz = asyncHandler(async (req, res, next) => {
+  if (req.files && req.files.media && req.files.media.length) {
+    // Initialize an array to store the names of uploaded files
+    req.body.media = [];
+
+    // Loop through all files in the 'media' array
+    // eslint-disable-next-line no-restricted-syntax
+    for (const file of req.files.media) {
+      const fileExtension = path.extname(file.originalname);
+      const newFileName = `media-${uuidv4()}-${Date.now()}${fileExtension}`;
+
+      // Check if the file type is allowed
+      if (
+        [
+          "image/jpeg",
+          "image/png",
+          "image/gif",
+          "application/pdf",
+          "application/msword",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ].includes(file.mimetype)
+      ) {
+        // Save each file to the uploads directory
+        // eslint-disable-next-line no-await-in-loop
+        await fs.writeFile(
+          path.join("uploads", "messages", newFileName),
+          file.buffer
+        );
+        req.body.media.push(newFileName); // Append the new file name to the media array
+      } else {
+        // If the file type is not allowed, you can choose to stop processing or just skip the file
+        // eslint-disable-next-line no-continue
+        continue; // Skips adding this file to the uploads, no error thrown for other files
+      }
+    }
+
+    // If no files were saved and all were skipped due to unsupported types, you may want to handle it
+    if (!req.body.media.length) {
+      return next(
+        new ApiError(
+          "Unsupported file types provided. Only images, PDF, and Word documents are allowed.",
+          400
+        )
+      );
+    }
+  }
+
+  next();
+});
 //@desc add a message to chat
 //@route POST /api/v1/message/:chatId
 //@access protected
@@ -26,7 +86,8 @@ exports.addMessage = asyncHandler(async (req, res, next) => {
 
   // Check if the logged-in user is a participant of the chat
   const participantIds = chat.participants.map((participant) =>
-    String(participant.user._id)
+    String(participant.user ? participant.user._id : null)  // Handle case where participant.user might be null
+  
   );
 
   if (!participantIds.includes(String(sender))) {
@@ -57,7 +118,7 @@ exports.addMessage = asyncHandler(async (req, res, next) => {
       await sendEmail({
         to: receiver.email,
         subject: "New message in chat",
-        text: `You have a new message in the chat from ${req.user.username}.`,
+        text: `You have a new message in the chat from ${req.user.name}.`,
       });
     });
   }
@@ -284,6 +345,28 @@ exports.replyToMessage = asyncHandler(async (req, res, next) => {
       chat: repliedMessage.chat,
       type: "chat",
     });
+
+    //send email to the sender of the replied message
+    //   const user = await User.findById(repliedMessage.sender._id);
+
+    //   const emailMessage = `Hi ${user.name},
+    //   \n You have a new reply to your message.
+    //   \n\n Message: ${text}
+    //   \n\nClick here to view the message: https://nexgen-academy.com/en/chat/${repliedMessage.chat}
+    //   \n\n Regards,
+    //   \n Team NEXGEN Academy`;
+
+    //   // Try to send the email, ignore errors
+    //   try {
+    //     await sendEmail({
+    //       to: user.email,
+    //       subject: "New reply to your message",
+    //       text: emailMessage,
+    //     });
+    //   } catch (error) {
+    //     // Log the error (optional) or handle it as needed
+    //     console.error("Failed to send email:", error);
+    //   }
   }
   const message = await Message.findById(replyMessage._id);
 
