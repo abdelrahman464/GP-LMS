@@ -3,11 +3,11 @@ const sharp = require("sharp");
 const { v4: uuidv4 } = require("uuid");
 const mongoose = require("mongoose");
 const Chat = require("../models/ChatModel");
+const User = require("../models/userModel")
 const Message = require("../models/MessageModel");
 const Notification = require("../models/notificationModel");
 const ApiError = require("../utils/apiError");
 const { uploadSingleFile } = require("../middlewares/uploadImageMiddleware");
-
 //upload Singel image
 exports.uploadImage = uploadSingleFile("image");
 //image processing
@@ -311,31 +311,43 @@ exports.addMemberToChat = asyncHandler(async (user, marketer) => {
 //@access protected
 exports.addParticipantToChat = asyncHandler(async (req, res, next) => {
   const { chatId } = req.params;
-  const { user, isAdmin } = req.body; // ID of the participant to be added and their role
-  const loggedUserId = req.user._id; // logged user id
+  const { userEmail, isAdmin } = req.body; // User email to be added and their role
+  const loggedUserId = req.user._id; // Logged-in user ID
+
+  // Check if user exists
+  const existingUser = await User.findOne({ email: userEmail });
+  if (!existingUser) {
+    return next(new ApiError("User not found", 404));
+  }
+
+  const userToAdd = existingUser._id;
 
   const chat = await Chat.findById(chatId);
 
   if (!chat) {
     return next(new ApiError("Chat not found", 404));
   }
-  if (chat.isGroupChat === false) {
+  if (!chat.isGroupChat) {
     return next(new ApiError("This is not a group chat", 400));
   }
-  // Find the logged-in user in the chat to verify admin privileges
-  const loggedUser = chat.participants.find(
-    (participant_) => String(participant_.user._id) === String(loggedUserId)
-  );
 
+  
+ // Find the logged-in user in the chat to verify admin privileges
+const loggedUser = chat.participants.find(
+  (participant) => participant.user && String(participant.user._id) === String(loggedUserId)
+);
+
+
+  
   if (!loggedUser || !loggedUser.isAdmin) {
     return next(
-      new ApiError("Unauthorized: You are not an admin in this Group", 403)
+      new ApiError("Unauthorized: You are not an admin in this group", 403)
     );
   }
 
   // Check if the user is already a participant in the chat
   const existingParticipant = chat.participants.find(
-    (participant) => String(participant.user) === user
+    (participant) => String(participant.user) === String(userToAdd)
   );
 
   if (existingParticipant) {
@@ -343,50 +355,60 @@ exports.addParticipantToChat = asyncHandler(async (req, res, next) => {
   }
 
   // Update the chat document to add the new participant with their role
-  const thisChat = await Chat.findByIdAndUpdate(
+  const updatedChat = await Chat.findByIdAndUpdate(
     chatId,
-    { $push: { participants: { user, isAdmin } } },
+    { $push: { participants: { user: userToAdd, isAdmin } } },
     { new: true } // To return the modified document
   );
 
-  if (thisChat) {
+  if (updatedChat) {
     await Notification.create({
-      user: user,
+      user: userToAdd,
       message: `${req.user.name} has added you to a group chat`,
-      chat: thisChat._id,
+      chat: updatedChat._id,
       type: "chat",
     });
   }
 
-  res.status(200).json({ data: "user added successfully" });
+  res.status(200).json({ message: "User added successfully" });
 });
+
 //@desc Remove a participant from a chat
 //@route PUT /api/v1/chat/:chatId/removeParticipant
 //@access protected
 exports.removeParticipantFromChat = asyncHandler(async (req, res, next) => {
   const { chatId } = req.params;
-  const { user } = req.body; // ID of the participant to be removed
-  const loggedUserId = req.user._id; // logged user id
+  const { userEmail } = req.body; // Email of the participant to be removed
+  const loggedUserId = req.user._id; // Logged-in user ID
+
+  // Check if user exists
+  const existingUser = await User.findOne({ email: userEmail });
+  if (!existingUser) {
+    return next(new ApiError("User not found", 404));
+  }
+
+  const userToRemove = existingUser._id;
 
   const chat = await Chat.findById(chatId);
 
   if (!chat) {
     return next(new ApiError("Chat not found", 404));
   }
+
   // Find the logged-in user in the chat to verify admin privileges
   const loggedUser = chat.participants.find(
-    (participant_) => String(participant_.user._id) === String(loggedUserId)
+    (participant) => participant.user && String(participant.user._id) === String(loggedUserId)
   );
 
   if (!loggedUser || !loggedUser.isAdmin) {
     return next(
-      new ApiError("Unauthorized: You are not an admin in this Group", 403)
+      new ApiError("Unauthorized: You are not an admin in this group", 403)
     );
   }
 
   // Find the index of the participant in the chat
   const participantIndex = chat.participants.findIndex(
-    (participant) => String(participant.user._id) === user
+    (participant) => participant.user && String(participant.user._id) === String(userToRemove)
   );
 
   if (participantIndex === -1) {
@@ -394,30 +416,39 @@ exports.removeParticipantFromChat = asyncHandler(async (req, res, next) => {
   }
 
   // Update the chat document to remove the participant
-  const thisChat = await Chat.findByIdAndUpdate(
+  const updatedChat = await Chat.findByIdAndUpdate(
     chatId,
-    { $pull: { participants: { user: user } } },
+    { $pull: { participants: { user: userToRemove } } },
     { new: true } // To return the modified document
   );
 
-  if (thisChat) {
+  if (updatedChat) {
     await Notification.create({
-      user: user,
-      message: `${req.user.name} has added you to a group chat`,
-      chat: thisChat._id,
+      user: userToRemove,
+      message: `${req.user.name} has removed you from a group chat`,
+      chat: updatedChat._id,
       type: "chat",
     });
   }
 
-  res.status(200).json({ data: "user removed successfully" });
+  res.status(200).json({ message: "User removed successfully" });
 });
+
 //@desc Update participant role in a chat
 //@route PUT /api/v1/chat/:chatId/updateParticipantRole
 //@access protected
 exports.updateParticipantRoleInChat = asyncHandler(async (req, res, next) => {
-  const { user, isAdmin } = req.body; // Chat ID, User ID, and desired role
+  const { userEmail, isAdmin } = req.body; // User email and desired role
   const { chatId } = req.params;
-  const loggedUserId = req.user._id; // logged user id
+  const loggedUserId = req.user._id; // Logged user ID
+
+  // Check if user exists
+  const existingUser = await User.findOne({ email: userEmail });
+  if (!existingUser) {
+    return next(new ApiError("User not found", 404));
+  }
+
+  const userToUpdate = existingUser._id;
 
   const chat = await Chat.findById(chatId);
   if (!chat) {
@@ -426,28 +457,28 @@ exports.updateParticipantRoleInChat = asyncHandler(async (req, res, next) => {
 
   // Find the logged-in user in the chat to verify admin privileges
   const loggedUser = chat.participants.find(
-    (participant_) => String(participant_.user._id) === String(loggedUserId)
+    (participant) => participant.user && String(participant.user._id) === String(loggedUserId)
   );
 
   if (!loggedUser || !loggedUser.isAdmin) {
     return next(
-      new ApiError("Unauthorized: You are not an admin in this Group", 403)
+      new ApiError("Unauthorized: You are not an admin in this group", 403)
     );
   }
 
   // Find the participant to update their role
   const participantToUpdate = chat.participants.find(
-    (participant_) => String(participant_.user._id) === user
+    (participant) => participant.user && String(participant.user._id) === String(userToUpdate)
   );
 
   if (!participantToUpdate) {
     return next(new ApiError("Participant not found in the chat", 404));
   }
 
-  // Check if the userId from body matches the creator of the chat
+  // Check if the user ID from body matches the creator of the chat
   const creatorOfChat = chat.creator._id; // Assuming the creator is the first participant
 
-  if (String(creatorOfChat) === user) {
+  if (String(creatorOfChat) === String(userToUpdate)) {
     return next(
       new ApiError("Unauthorized: Cannot update the creator's role", 403)
     );
@@ -455,22 +486,22 @@ exports.updateParticipantRoleInChat = asyncHandler(async (req, res, next) => {
 
   // Update the participant's role directly in the database
   const thisChat = await Chat.updateOne(
-    { _id: chatId, "participants.user": user },
+    { _id: chatId, "participants.user": userToUpdate },
     { $set: { "participants.$.isAdmin": isAdmin } }
   );
 
   if (thisChat) {
     await Notification.create({
-      user: user,
+      user: userToUpdate,
       message: `${req.user.name} has updated your role in a group chat to ${
         isAdmin ? "admin" : "participant"
       }`,
-      chat: thisChat._id,
+      chat: chat._id,
       type: "chat",
     });
   }
 
-  res.status(200).json({ data: "user updated successfully" });
+  res.status(200).json({ data: "User role updated successfully" });
 });
 
 //@desc Get details of a specific chat including participants' details
@@ -478,38 +509,137 @@ exports.updateParticipantRoleInChat = asyncHandler(async (req, res, next) => {
 //@access protected
 exports.getChatDetails = asyncHandler(async (req, res, next) => {
   const { chatId } = req.params;
+  const baseUrl = process.env.BASE_URL; // Set your domain URL here
 
-  // Fetch the chat details along with the user details for each participant
-  const chat = await Chat.findById(chatId).populate({
-    path: "participants.user",
-    select:
-      "_id name email password isOAuthUser role active createdAt updatedAt __v profileImg",
-  });
+  try {
+    const chat = await Chat.aggregate([
+      {
+        $match: { _id: mongoose.Types.ObjectId(chatId) },
+      },
+      {
+        $lookup: {
+          from: "messages",
+          let: { chatId: "$_id" },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$chat", "$$chatId"] } } },
+            { $sort: { createdAt: -1 } },
+            { $limit: 1 },
+            {
+              $lookup: {
+                from: "users",
+                localField: "sender",
+                foreignField: "_id",
+                as: "senderDetails",
+              },
+            },
+            {
+              $addFields: {
+                media: {
+                  $map: {
+                    input: "$media",
+                    as: "file",
+                    in: { $concat: [baseUrl, "/messages/", "$$file"] },
+                  },
+                },
+              },
+            },
+            {
+              $project: {
+                text: 1,
+                media: 1,
+                createdAt: 1,
+                sender: 1,
+                senderDetails: { $arrayElemAt: ["$senderDetails", 0] },
+              },
+            },
+          ],
+          as: "lastMessage",
+        },
+      },
+      { $unwind: "$participants" },
+      {
+        $lookup: {
+          from: "users",
+          localField: "participants.user",
+          foreignField: "_id",
+          as: "participants.userDetails",
+        },
+      },
+      { $unwind: "$participants.userDetails" },
+      {
+        $addFields: {
+          "participants.userDetails.profileImg": {
+            $cond: {
+              if: "$participants.userDetails.profileImg",
+              then: {
+                $concat: [
+                  baseUrl,
+                  "/users/",
+                  "$participants.userDetails.profileImg",
+                ],
+              },
+              else: null,
+            },
+          },
+        },
+      },
+      {
+        $group: {
+          _id: "$_id",
+          participants: { $push: "$participants" },
+          root: { $mergeObjects: "$$ROOT" },
+        },
+      },
+      {
+        $replaceRoot: {
+          newRoot: {
+            $mergeObjects: ["$root", "$$ROOT"],
+          },
+        },
+      },
+      {
+        $addFields: {
+          image: {
+            $cond: {
+              if: "$image",
+              then: { $concat: [baseUrl, "/chats/", "$image"] },
+              else: null,
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          participants: 1,
+          isGroupChat: 1,
+          image: 1,
+          groupName: 1,
+          description: 1,
+          archived: 1,
+          lastMessage: 1,
+          _id: 1,
+        },
+      },
+    ]);
 
-  if (!chat) {
-    return res.status(404).json({ error: "Chat not found" });
+    if (!chat || chat.length === 0) {
+      return res.status(404).json({ error: "Chat not found" });
+    }
+
+    res.status(200).json({
+      status: "success",
+      results: 1,
+      data: chat[0],
+    });
+  } catch (error) {
+    console.error("Error fetching chat details:", error);
+    res.status(500).json({
+      status: "error",
+      message: "Failed to fetch chat details",
+    });
   }
-  // get chat media in messages belong to this chat
-  const messages = await Message.find({ chat: chatId, media: { $ne: [] } });
-  const mediaUrls = messages.map((message) => message.media).flat(); // Flattens the array of arrays into a single array
-
-  // Transform the participants structure to include userDetails
-  const transformedParticipants = chat.participants.map((participant) => ({
-    user: participant.user,
-    isAdmin: participant.isAdmin,
-    _id: participant._id,
-    userDetails: participant.user,
-  }));
-
-  const transformedChat = {
-    _id: chat._id,
-    participants: transformedParticipants,
-    isGroupChat: chat.isGroupChat,
-    image: chat.image,
-  };
-
-  res.status(200).json({ data: transformedChat, mediaUrls });
 });
+
 
 //@desc Update chat information (e.g., group name, description)
 //@route PUT /api/v1/chat/:chatId/update
