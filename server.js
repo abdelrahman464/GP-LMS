@@ -32,11 +32,7 @@ const app = express();
 const CompleteServer = http.createServer(app);
 
 // Integrate Socket.IO with the HTTP server
-socketIOServer.attach(CompleteServer
-  // cors: {
-  //   // origin: process.env.CORS_ORIGIN,
-  // },
-);
+socketIOServer.attach(CompleteServer);
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
 app.options("*", cors());
