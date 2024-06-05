@@ -204,18 +204,17 @@ exports.getRelatedCoursesValidator = [
 ];
 
 exports.checkCourseOwnership = [
-  check("courseId")
+  check("id")
     .isMongoId()
     .withMessage("Invalid ID format")
     .custom((val, { req }) =>
       Course.findById(val).then((course) => {
-        if (req.user.role === "admin") return true;
         if (!course) {
           return Promise.reject(new Error(`Course not found`));
         }
-        if (
-          course.instructor._id.toString() !== req.user._id.toString() &&
-          req.user.role !== "admin"
+        if (req.user.role === "admin") return true;
+        else if (
+          course.instructor._id.toString() !== req.user._id.toString()
         ) {
           return Promise.reject(
             new Error(`Your are not allowed to perform this action`)

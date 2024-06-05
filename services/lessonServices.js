@@ -2,6 +2,7 @@ const asyncHandler = require("express-async-handler");
 const sharp = require("sharp");
 const { v4: uuidv4 } = require("uuid");
 const Lesson = require("../models/lessonModel");
+const Section = require("../models/sectionModel");
 const factory = require("./handllerFactory");
 const { uploadSingleImage } = require("../middlewares/uploadImageMiddleware");
 
@@ -45,3 +46,13 @@ exports.updateLesson = factory.updateOne(Lesson);
 
 // Delete a lesson by ID
 exports.deleteLesson = factory.deleteOne(Lesson);
+
+exports.getLessonsByCourseId = asyncHandler(async (req, res) => {
+  const sections = await Section.find({ course: req.params.courseId });
+  const sectionIds = sections.map((section) => section._id);
+  const lessons = await Lesson.find({ section: { $in: sectionIds } });
+  res.status(200).json({
+    status: "success",
+    data: lessons,
+  });
+});

@@ -18,6 +18,8 @@ const OrderRoute = require("./OrderRoute");
 
 const InstructorRoute = require("./instructorsReqsRoute");
 
+const LiveRoute = require("./LiveRoute");
+
 const mountRoutes = (app) => {
   // Mount Routes
   app.use("/api/v1/users", userRoute);
@@ -40,6 +42,6 @@ const mountRoutes = (app) => {
   app.use("/api/v1/chats", ChatRoute);
   app.use("/api/v1/messages", MessageRoute);
   app.use("/api/v1/notifications", notificationRoute);
-
+  app.use("/api/v1/lives", LiveRoute);
 };
 module.exports = mountRoutes;

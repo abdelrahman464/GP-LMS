@@ -13,6 +13,7 @@ const {
   getLessonById,
   createFilterObj,
   getLessons,
+  getLessonsByCourseId,
 } = require("../services/lessonServices");
 
 const router = express.Router();
@@ -28,6 +29,7 @@ router.post(
 );
 // Get all lessons of a section
 router.get("/:sectionId", authServices.protect, createFilterObj, getLessons);
+router.get("/incourse/:courseId", authServices.protect, getLessonsByCourseId);
 
 // Get a specific lesson by ID
 router.get("/:id", authServices.protect, getLessonById);
