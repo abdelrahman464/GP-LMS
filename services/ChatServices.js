@@ -7,9 +7,9 @@ const User = require("../models/userModel")
 const Message = require("../models/MessageModel");
 const Notification = require("../models/notificationModel");
 const ApiError = require("../utils/apiError");
-const { uploadSingleFile } = require("../middlewares/uploadImageMiddleware");
+const { uploadSingleImage } = require("../middlewares/uploadImageMiddleware");
 //upload Singel image
-exports.uploadImage = uploadSingleFile("image");
+exports.uploadImage = uploadSingleImage("image");
 //image processing
 exports.resizeImage = asyncHandler(async (req, res, next) => {
   const { file } = req; // Access the uploaded file

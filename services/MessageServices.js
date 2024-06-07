@@ -9,10 +9,10 @@ const Notification = require("../models/notificationModel");
 const factory = require("./handllerFactory");
 const ApiError = require("../utils/apiError");
 // const sendEmail = require("../utils/sendEmail");
-const { uploadMixOfFiles } = require("../middlewares/uploadImageMiddleware");
+const { uploadMixOfImages } = require("../middlewares/uploadImageMiddleware");
 const sendEmail = require("../utils/sendEmail");
 
-exports.uploadMedia = uploadMixOfFiles([
+exports.uploadMedia = uploadMixOfImages([
   {
     name: "media",
     maxCount: 15,
