@@ -28,12 +28,7 @@ const {
 const router = express.Router();
 
 router.get("/getMe", authServices.protect, getLoggedUserData, getUser);
-router.get(
-  "/getInstructors",
-  authServices.protect,
-  createFilterToGetInstructors,
-  getUsers
-);
+router.get("/getInstructors", createFilterToGetInstructors, getUsers);
 
 router.put(
   "/changeMyPassword",
