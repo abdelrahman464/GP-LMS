@@ -20,6 +20,7 @@ const {
   relatedCourses,
   addUserToCourse,
   getCourseSubscripers,
+  createFilterObj
 } = require("../services/courseService");
 const authServices = require("../services/authServices");
 // nested routes
@@ -42,7 +43,7 @@ router.post(
 );
 
 // Get all courses
-router.get("/", getAllCourses);
+router.get("/", createFilterObj, getAllCourses);
 router.get(
   "/MyCourses",
   authServices.protect,

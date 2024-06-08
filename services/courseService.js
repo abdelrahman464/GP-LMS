@@ -8,6 +8,12 @@ const factory = require("./handllerFactory");
 const { uploadSingleImage } = require("../middlewares/uploadImageMiddleware");
 const ApiError = require("../utils/apiError");
 
+exports.createFilterObj = (req, res, next) => {
+  let filterObject = {};
+  if (req.params.catId) filterObject = { category: req.params.catId };
+  req.filterObj = filterObject;
+  next();
+};
 //upload Singel image
 exports.uploadCourseImage = uploadSingleImage("image");
 //image processing

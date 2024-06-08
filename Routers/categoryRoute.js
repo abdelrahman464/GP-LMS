@@ -19,7 +19,7 @@ const authServices = require("../services/authServices");
 
 const router = express.Router();
 
-router.use("/:categoryId/courses", courseRoute);
+router.use("/:catId/courses", courseRoute);
 
 router
   .route("/")
